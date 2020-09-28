@@ -190,8 +190,8 @@ val ssa_cc_trans_inst_def = Define`
   (ssa_cc_trans_inst (FP (FPEqual r f1 f2)) ssa na =
     let (r',ssa',na') = next_var_rename r ssa na in
       (Inst (FP (FPEqual r' f1 f2)),ssa',na')) ∧
-  (ssa_cc_trans_inst (FP (FPMovToReg r1 r2 d):'a inst) ssa na =
-    if dimindex(:'a) = 64 then
+  (ssa_cc_trans_inst (FP (FPMovToReg r1 r2 d)) ssa na =
+    if r1 = r2 then
       let (r1',ssa',na') = next_var_rename r1 ssa na in
         (Inst (FP (FPMovToReg r1' r2 d)),ssa',na')
     else
@@ -507,10 +507,8 @@ val get_writes_inst_def = Define`
   (get_writes_inst (FP (FPLess r f1 f2)) = insert r () LN) ∧
   (get_writes_inst (FP (FPLessEqual r f1 f2)) = insert r () LN) ∧
   (get_writes_inst (FP (FPEqual r f1 f2)) = insert r () LN) ∧
-  (get_writes_inst (FP (FPMovToReg r1 r2 d) :'a inst) =
-    if dimindex(:'a) = 64
-      then insert r1 () LN
-      else insert r2 () (insert r1 () LN)) ∧
+  (get_writes_inst (FP (FPMovToReg r1 r2 d)) =
+    insert r2 () (insert r1 () LN)) ∧
   (get_writes_inst inst = LN)`
 
 (*Liveness for instructions, follows liveness equations
@@ -547,14 +545,10 @@ val get_live_inst_def = Define`
   (get_live_inst (FP (FPLess r f1 f2)) live = delete r live) ∧
   (get_live_inst (FP (FPLessEqual r f1 f2)) live = delete r live) ∧
   (get_live_inst (FP (FPEqual r f1 f2)) live = delete r live) ∧
-  (get_live_inst (FP (FPMovToReg r1 r2 d): 'a inst) live =
-    if dimindex(:'a) = 64
-      then delete r1 live
-      else delete r1 (delete r2 live)) ∧
+  (get_live_inst (FP (FPMovToReg r1 r2 d)) live =
+     delete r1 (delete r2 live)) ∧
   (get_live_inst (FP (FPMovFromReg d r1 r2)) live =
-    if dimindex(:'a) = 64
-      then insert r1 () live
-      else insert r2 () (insert r1 () live)) ∧
+     insert r2 () (insert r1 () live)) ∧
   (*Catchall -- for future instructions to be added*)
   (get_live_inst x live = live)`
 
@@ -653,9 +647,8 @@ val remove_dead_inst_def = Define`
   (remove_dead_inst (FP (FPLess r f1 f2)) live = (lookup r live = NONE)) ∧
   (remove_dead_inst (FP (FPLessEqual r f1 f2)) live = (lookup r live = NONE)) ∧
   (remove_dead_inst (FP (FPEqual r f1 f2)) live = (lookup r live = NONE)) ∧
-  (remove_dead_inst (FP (FPMovToReg r1 r2 d) :'a inst) live =
-    if dimindex(:'a) = 64 then lookup r1 live = NONE
-    else (lookup r1 live = NONE ∧ (lookup r2 live = NONE))) ∧
+  (remove_dead_inst (FP (FPMovToReg r1 r2 d)) live =
+    (lookup r1 live = NONE ∧ (lookup r2 live = NONE))) ∧
   (*Catchall -- for other instructions*)
   (remove_dead_inst x live = F)`
 
@@ -808,14 +801,10 @@ val get_delta_inst_def = Define`
   (get_delta_inst (FP (FPLess r f1 f2)) = Delta [r] []) ∧
   (get_delta_inst (FP (FPLessEqual r f1 f2)) = Delta [r] []) ∧
   (get_delta_inst (FP (FPEqual r f1 f2)) = Delta [r] []) ∧
-  (get_delta_inst (FP (FPMovToReg r1 r2 d):'a inst) =
-    if dimindex(:'a) = 64
-      then Delta [r1] []
-      else Delta [r1;r2] []) ∧
+  (get_delta_inst (FP (FPMovToReg r1 r2 d)) =
+    Delta [r1;r2] []) ∧
   (get_delta_inst (FP (FPMovFromReg d r1 r2)) =
-    if dimindex(:'a) = 64
-      then Delta [] [r1]
-      else Delta [] [r1;r2]) ∧
+    Delta [] [r1;r2]) ∧
   (*Catchall -- for future instructions to be added*)
   (get_delta_inst x = Delta [] [])`
 
@@ -1029,7 +1018,7 @@ val get_heu_inst_def = Define`
      (add1_lhs_reg r lr)) ∧
   (get_heu_inst (FP (FPEqual r f1 f2)) lr =
      (add1_lhs_reg r lr)) ∧
-  (get_heu_inst (FP (FPMovToReg r1 r2 d):'a inst) lr =
+  (get_heu_inst (FP (FPMovToReg r1 r2 d)) lr =
      (add1_lhs_reg r2 (add1_lhs_reg r1 lr))) ∧
   (get_heu_inst (FP (FPMovFromReg d r1 r2)) lr =
      (add1_rhs_reg r2 (add1_rhs_reg r1 lr))) ∧
@@ -1112,7 +1101,7 @@ val get_heu_def = Define `
 
 (* Forced edges for certain instructions *)
 val get_forced_def = Define`
-  (get_forced (c:'a asm_config) ((Inst i):'a prog) acc =
+  (get_forced (c:asm_config) ((Inst i):'a prog) acc =
     dtcase i of
       Arith (AddCarry r1 r2 r3 r4) =>
        if (c.ISA = MIPS ∨ c.ISA = RISC_V) then
@@ -1140,10 +1129,10 @@ val get_forced_def = Define`
        else
          acc
     | FP (FPMovToReg r1 r2 d) =>
-        (if dimindex(:'a) = 32 ∧ r1 ≠ r2 then [(r1,r2)]
+        (if r1 ≠ r2 then [(r1,r2)]
         else []) ++ acc
     | FP (FPMovFromReg d r1 r2) =>
-        (if dimindex(:'a) = 32 ∧ r1 ≠ r2 then [(r1,r2)]
+        (if r1 ≠ r2 then [(r1,r2)]
         else []) ++ acc
     | _ => acc) ∧
   (get_forced c (MustTerminate s1) acc =
@@ -1160,7 +1149,7 @@ val get_forced_def = Define`
 
 Theorem get_forced_pmatch:
   !c prog acc.
-  (get_forced (c:'a asm_config) prog acc =
+  (get_forced (c:asm_config) prog acc =
     case prog of
       Inst(Arith (AddCarry r1 r2 r3 r4)) =>
        if (c.ISA = MIPS ∨ c.ISA = RISC_V) then
@@ -1188,10 +1177,10 @@ Theorem get_forced_pmatch:
        else
          acc
     | Inst (FP (FPMovToReg r1 r2 d)) =>
-        (if dimindex(:'a) = 32 ∧ r1 ≠ r2 then [(r1,r2)]
+        (if r1 ≠ r2 then [(r1,r2)]
         else []) ++ acc
     | Inst (FP (FPMovFromReg d r1 r2)) =>
-        (if dimindex(:'a) = 32 ∧ r1 ≠ r2 then [(r1,r2)]
+        (if r1 ≠ r2 then [(r1,r2)]
         else []) ++ acc
     | MustTerminate s1 => get_forced c s1 acc
     | Seq s1 s2 => get_forced c s1 (get_forced c s2 acc)

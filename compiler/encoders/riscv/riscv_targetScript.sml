@@ -259,6 +259,7 @@ val riscv_config_def = Define`
     ; link_reg := SOME 1
     ; two_reg_arith := F
     ; big_endian := F
+    ; word_length := 64
     ; valid_imm := (\b i. (if b = INL Sub then ^min12 < i else ^min12 <= i) /\
                           i <= ^max12)
     ; addr_offset := (^min12, ^max12)

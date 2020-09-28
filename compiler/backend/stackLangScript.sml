@@ -23,7 +23,7 @@ val _ = Datatype `
 
 val _ = Datatype `
   prog = Skip
-       | Inst ('a inst)
+       | Inst inst
        | Get num store_name
        | Set store_name num
        | Call ((stackLang$prog # num # num # num) option)
@@ -32,8 +32,8 @@ val _ = Datatype `
               ((stackLang$prog # num # num) option)
               (* handler: exception-handler code, labels l1,l2*)
        | Seq stackLang$prog stackLang$prog
-       | If cmp num ('a reg_imm) stackLang$prog stackLang$prog
-       | While cmp num ('a reg_imm) stackLang$prog
+       | If cmp num reg_imm stackLang$prog stackLang$prog
+       | While cmp num reg_imm stackLang$prog
        | JumpLower num num num (* reg, reg, target name *)
        | Alloc num
        | Raise num

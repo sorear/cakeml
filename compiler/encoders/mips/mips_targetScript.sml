@@ -287,6 +287,7 @@ val mips_config_def = Define`
     ; link_reg := SOME 31
     ; two_reg_arith := F
     ; big_endian := T
+    ; word_length := 64
     ; valid_imm :=
        (\b i. if b IN {INL And; INL Or; INL Xor; INR Test; INR NotTest} then
                 0w <= i /\ i <= ^umax16

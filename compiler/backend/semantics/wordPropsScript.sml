@@ -77,8 +77,8 @@ Theorem ALL_DISTINCT_MEM_IMP_ALOOKUP_SOME = Q.prove(`
 (*TODO: define globally somewhere? *)
 fun get_thms ty = { case_def = TypeBase.case_def_of ty, nchotomy = TypeBase.nchotomy_of ty }
 val case_eq_thms = pair_case_eq::bool_case_eq::map (prove_case_eq_thm o get_thms)
-  [``:'a option``,``:'a list``,``:'a word_loc``,``:'a inst``
-  ,``:'a arith``,``:'a addr``,``:memop``,``:'a wordSem$result``,``:'a ffi_result``] |> LIST_CONJ |> curry save_thm "case_eq_thms"
+  [``:'a option``,``:'a list``,``:'a word_loc``,``:inst``
+  ,``:arith``,``:addr``,``:memop``,``:'a wordSem$result``,``:'a ffi_result``] |> LIST_CONJ |> curry save_thm "case_eq_thms"
 
 Theorem set_store_const[simp]:
    (set_store x y z).clock = z.clock ∧
@@ -2828,12 +2828,12 @@ val flat_exp_conventions_def = Define`
   This also includes the FP conditions since we do not allocate them
 *)
 val inst_ok_less_def = Define`
-  (inst_ok_less (c:'a asm_config) (Arith (Binop b r1 r2 (Imm w))) ⇔
+  (inst_ok_less (c:asm_config) (Arith (Binop b r1 r2 (Imm w))) ⇔
     c.valid_imm (INL b) w) ∧
   (inst_ok_less c (Arith (Shift l r1 r2 n)) ⇔
-    (((n = 0) ==> (l = Lsl)) ∧ n < dimindex(:'a))) ∧
+    (((n = 0) ==> (l = Lsl)) ∧ n < c.word_length)) ∧
   (inst_ok_less c (Arith (Shift l r1 r2 n)) ⇔
-    (((n = 0) ==> (l = Lsl)) ∧ n < dimindex(:'a))) ∧
+    (((n = 0) ==> (l = Lsl)) ∧ n < c.word_length)) ∧
   (inst_ok_less c (Arith (Div r1 r2 r3)) ⇔
     (c.ISA ∈ {ARMv8; MIPS; RISC_V})) ∧
   (inst_ok_less c (Arith (LongMul r1 r2 r3 r4)) ⇔
@@ -2875,9 +2875,9 @@ val inst_ok_less_def = Define`
     fp_reg_ok d1 c /\ fp_reg_ok d2 c /\ fp_reg_ok d3 c) /\
   (inst_ok_less c (FP (FPMov d1 d2)) ⇔ fp_reg_ok d1 c  ∧ fp_reg_ok d2 c) ∧
   (inst_ok_less c (FP (FPMovToReg r1 r2 d)) ⇔
-      ((dimindex(:'a) = 32) ==> r1 <> r2) ∧ fp_reg_ok d c) ∧
+      ((c.word_length = 32) ==> r1 <> r2) ∧ fp_reg_ok d c) ∧
   (inst_ok_less c (FP (FPMovFromReg d r1 r2)) ⇔
-      ((dimindex(:'a) = 32) ==> r1 <> r2) ∧ fp_reg_ok d c) ∧
+      ((c.word_length = 32) ==> r1 <> r2) ∧ fp_reg_ok d c) ∧
   (inst_ok_less c (FP (FPToInt d1 d2)) ⇔ fp_reg_ok d1 c  ∧ fp_reg_ok d2 c) ∧
   (inst_ok_less c (FP (FPFromInt d1 d2)) ⇔ fp_reg_ok d1 c  ∧ fp_reg_ok d2 c) ∧
   (inst_ok_less _ _ = T)`

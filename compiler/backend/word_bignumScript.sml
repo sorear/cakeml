@@ -20,10 +20,10 @@ val _ = Datatype `
        | Seq mini mini
        | Load num num address
        | Store num num
-       | If cmp num ('a reg_imm) mini mini
+       | If cmp num reg_imm mini mini
        | Swap
-       | Add num num num ('a reg_imm) ('a reg_imm)
-       | Sub num num num ('a reg_imm) ('a reg_imm)
+       | Add num num num reg_imm reg_imm
+       | Sub num num num reg_imm reg_imm
        | Mul num num num num
        | Div num num num num num
        | Loop bool (num list) mini
@@ -58,7 +58,7 @@ local val s = HolKernel.syntax_fns1 "asm" in
   val (Reg_tm,mk_Reg,dest_Reg,is_Reg) = s "Reg"
 end
 
-val If_pat = ``word_bignum$If c r (ri:'a reg_imm) p1 p2``
+val If_pat = ``word_bignum$If c r (ri:reg_imm) p1 p2``
 fun dest_If tm = let
   val i = fst (match_term If_pat tm)
   fun list_dest f tm = let

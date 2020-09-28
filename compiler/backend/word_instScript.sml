@@ -189,7 +189,7 @@ val test = EVAL ``flatten_exp (pull_exp (Op Sub [Const 1w; Op Sub[Const 2w;Const
 *)
 
 val inst_select_exp_def = tDefine "inst_select_exp" `
-  (inst_select_exp (c:'a asm_config) (tar:num) (temp:num) (Load exp) =
+  (inst_select_exp (c:asm_config) (tar:num) (temp:num) (Load exp) =
     dtcase exp of
     | Op Add [exp';Const w] =>
       if addr_offset_ok c w then
@@ -225,7 +225,7 @@ val inst_select_exp_def = tDefine "inst_select_exp" `
       let p2 = inst_select_exp c (temp+1) (temp+1) e2 in
       Seq p1 (Seq p2 (Inst (Arith (Binop op tar temp (Reg (temp+1))))))) ∧
   (inst_select_exp c tar temp (Shift sh exp n) =
-    if (n < dimindex(:'a)) then
+    if (n < c.word_length) then
       let prog = inst_select_exp c temp temp exp in
       if n = 0 then
         Seq prog (Move 0 [tar,temp])
@@ -243,7 +243,7 @@ val inst_select_exp_def = tDefine "inst_select_exp" `
 
 Theorem inst_select_exp_pmatch:
   !c tar temp exp.
-  inst_select_exp (c:'a asm_config) tar temp exp =
+  inst_select_exp (c:asm_config) tar temp exp =
   case exp of
     Load(Op Add [exp';Const w]) =>
       if addr_offset_ok c w then
@@ -278,7 +278,7 @@ Theorem inst_select_exp_pmatch:
       let p2 = inst_select_exp c (temp+1) (temp+1) e2 in
       Seq (inst_select_exp c temp temp e1) (Seq p2 (Inst (Arith (Binop op tar temp (Reg (temp+1)))))))
   | Shift sh exp n =>
-    (if (n < dimindex(:'a)) then
+    (if (n < c.word_length) then
       let prog = inst_select_exp c temp temp exp in
       if n = 0 then
         Seq prog (Move 0 [tar,temp])

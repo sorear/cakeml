@@ -76,15 +76,16 @@ val ag32_enc_def = Define`
    (ag32_enc (Inst Skip) =
       enc (Normal (fOr, 0w, Reg 0w, Imm 0w))) /\
    (ag32_enc (Inst (Const r i)) =
-      ag32_encode (ag32_constant (n2w r, i))) /\
+      ag32_encode (ag32_constant (n2w r, w2w i))) /\
    (ag32_enc (Inst (Arith (Binop bop r1 r2 (Reg r3)))) =
       enc (Normal (ag32_bop bop, n2w r1, Reg (n2w r2), Reg (n2w r3)))) /\
    (ag32_enc (Inst (Arith (Binop bop r1 r2 (asm$Imm i)))) =
-    if -32w <= i /\ i < 32w then
+    let i32 = w2w i : word32 in
+    if -32w <= i32 /\ i32 < 32w then
       enc (Normal (ag32_bop bop, n2w r1, Reg (n2w r2), Imm (w2w i)))
     else
       ag32_encode
-        (ag32_constant (temp_reg, i) ++
+        (ag32_constant (temp_reg, i32) ++
         [Normal (ag32_bop bop, n2w r1, Reg (n2w r2), Reg temp_reg)])) /\
    (ag32_enc (Inst (Arith (asm$Shift sh r1 r2 n))) =
       enc (Shift (ag32_sh sh, n2w r1, Reg (n2w r2), Imm (n2w n)))) /\
@@ -108,53 +109,57 @@ val ag32_enc_def = Define`
         [Normal (fSub, n2w r1, Reg (n2w r2), Reg (n2w r3));
          Normal (fOverflow, n2w r4, Imm 0w, Imm 0w)]) /\
    (ag32_enc (Inst (Mem Load r1 (Addr r2 a))) =
-    if -32w <= a /\ a < 32w then
+    let a32 = w2w a : word32 in
+    if -32w <= a32 /\ a32 < 32w then
       ag32_encode
         [Normal (fAdd, n2w r1, Reg (n2w r2), Imm (w2w a));
          LoadMEM (n2w r1, Reg (n2w r1))]
     else
       ag32_encode
-        (ag32_constant (temp_reg, a) ++
+        (ag32_constant (temp_reg, a32) ++
          [Normal (fAdd, n2w r1, Reg (n2w r2), Reg temp_reg);
          LoadMEM (n2w r1, Reg (n2w r1))])) /\
    (ag32_enc (Inst (Mem Load8 r1 (Addr r2 a))) =
-    if -32w <= a /\ a < 32w then
+    let a32 = w2w a : word32 in
+    if -32w <= a32 /\ a32 < 32w then
       ag32_encode
         [Normal (fAdd, n2w r1, Reg (n2w r2), Imm (w2w a));
          LoadMEMByte (n2w r1, Reg (n2w r1))]
     else
       ag32_encode
-        (ag32_constant (temp_reg, a) ++
+        (ag32_constant (temp_reg, a32) ++
          [Normal (fAdd, n2w r1, Reg (n2w r2), Reg temp_reg);
          LoadMEMByte (n2w r1, Reg (n2w r1))])) /\
    (ag32_enc (Inst (Mem Store r1 (Addr r2 a))) =
-    if -32w <= a /\ a < 32w then
+    let a32 = w2w a : word32 in
+    if -32w <= a32 /\ a32 < 32w then
       ag32_encode
         [Normal (fAdd, temp_reg, Reg (n2w r2), Imm (w2w a));
          StoreMEM (Reg (n2w r1), Reg temp_reg)]
     else
       ag32_encode
-        (ag32_constant (temp_reg, a) ++
+        (ag32_constant (temp_reg, a32) ++
          [Normal (fAdd, temp_reg, Reg (n2w r2), Reg temp_reg);
          StoreMEM (Reg (n2w r1), Reg temp_reg)])) /\
    (ag32_enc (Inst (Mem Store8 r1 (Addr r2 a))) =
-    if -32w <= a /\ a < 32w then
+    let a32 = w2w a : word32 in
+    if -32w <= a32 /\ a32 < 32w then
       ag32_encode
         [Normal (fAdd, temp_reg, Reg (n2w r2), Imm (w2w a));
          StoreMEMByte (Reg (n2w r1), Reg temp_reg)]
     else
       ag32_encode
-        (ag32_constant (temp_reg, a) ++
+        (ag32_constant (temp_reg, a32) ++
          [Normal (fAdd, temp_reg, Reg (n2w r2), Reg temp_reg);
          StoreMEMByte (Reg (n2w r1), Reg temp_reg)])) /\
    (ag32_enc (Inst (FP _)) = enc ReservedInstr) /\
    (ag32_enc (Jump a) =
         ag32_encode
-          (ag32_jump_constant (temp_reg, a, T) ++
+          (ag32_jump_constant (temp_reg, w2w a, T) ++
            [Jump (fAdd, temp_reg, Reg temp_reg)])) /\
    (ag32_enc (Call a) =
         ag32_encode
-          (ag32_jump_constant (temp_reg, a, T) ++
+          (ag32_jump_constant (temp_reg, w2w a, T) ++
            [Jump (fAdd, 0w, Reg temp_reg)])) /\
    (ag32_enc (JumpReg r) =
       enc (Jump (fSnd, temp_reg, Reg (n2w r)))) /\
@@ -162,12 +167,12 @@ val ag32_enc_def = Define`
       let j = i - 4w in
       ag32_encode
         (Jump (fAdd, n2w r, Imm 4w) ::
-            (ag32_jump_constant (temp_reg, j, F) ++
+            (ag32_jump_constant (temp_reg, w2w j, F) ++
              [Normal (fAdd, n2w r, Reg (n2w r), Reg temp_reg)]))) /\
    (ag32_enc (JumpCmp cmp r1 (Reg r2) a) =
       let arg = (ag32_cmp cmp, Reg temp_reg, Reg (n2w r1), Reg (n2w r2)) in
       ag32_encode
-        (ag32_jump_constant (temp_reg, a, T) ++
+        (ag32_jump_constant (temp_reg, w2w a, T) ++
          [if cmp IN {Test; NotEqual; NotLess; NotLower} then
            JumpIfZero arg
          else
@@ -175,7 +180,7 @@ val ag32_enc_def = Define`
    (ag32_enc (JumpCmp cmp r (asm$Imm i) a) =
       let arg = (ag32_cmp cmp, Reg temp_reg, Reg (n2w r), Imm (w2w i)) in
       ag32_encode
-        (ag32_jump_constant (temp_reg, a, T) ++
+        (ag32_jump_constant (temp_reg, w2w a, T) ++
          [if cmp IN {Test; NotEqual; NotLess; NotLower} then
            JumpIfZero arg
          else
@@ -195,6 +200,7 @@ val ag32_config_def = Define`
     ; link_reg := SOME 0
     ; two_reg_arith := F
     ; big_endian := F
+    ; word_length := 32
     ; valid_imm := \i n. if ISL i then
                            -0x7FFFFFw <= n /\ n < 0x7FFFFFw
                          else

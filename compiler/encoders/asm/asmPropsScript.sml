@@ -22,7 +22,7 @@ val offset_monotonic_def = Define `
   (a1 < 0w /\ a2 < 0w /\ a2 <= a1 ==> LENGTH (enc i1) <= LENGTH (enc i2))`
 
 val enc_ok_def = Define `
-  enc_ok (c : 'a asm_config) <=>
+  enc_ok (c : asm_config) <=>
     (* code alignment and length *)
     (2 EXP c.code_alignment = LENGTH (c.encode (Inst Skip))) /\
     (!w. (LENGTH (c.encode w) MOD 2 EXP c.code_alignment = 0) /\
@@ -39,7 +39,7 @@ val enc_ok_def = Define `
 
 val () = Datatype `
   target =
-    <| config : 'a asm_config
+    <| config : asm_config
      ; next : 'b -> 'b
      ; get_pc : 'b -> 'a word
      ; get_reg : 'b -> num -> 'a word
@@ -296,6 +296,7 @@ Theorem upd_pc_simps[simp]:
    ((asmSem$upd_pc x s).mem_domain = s.mem_domain) ∧
    ((asmSem$upd_pc x s).failed = s.failed) ∧
    ((asmSem$upd_pc x s).be = s.be) ∧
+   ((asmSem$upd_pc x s).wordlen = s.wordlen) ∧
    ((asmSem$upd_pc x s).mem = s.mem) ∧
    ((asmSem$upd_pc x s).regs = s.regs) ∧
    ((asmSem$upd_pc x s).fp_regs = s.fp_regs) ∧
@@ -321,6 +322,7 @@ QED
 
 val SND_read_mem_word_consts = Q.prove(
   `!n a s. ((SND (read_mem_word a n s)).be = s.be) /\
+            ((SND (read_mem_word a n s)).wordlen = s.wordlen) /\
             ((SND (read_mem_word a n s)).lr = s.lr) /\
             ((SND (read_mem_word a n s)).align = s.align) /\
             ((SND (read_mem_word a n s)).mem_domain = s.mem_domain)`,
@@ -330,6 +332,7 @@ val SND_read_mem_word_consts = Q.prove(
 
 val write_mem_word_consts = Q.prove(
   `!n a w s. ((write_mem_word a n w s).be = s.be) /\
+              ((write_mem_word a n w s).wordlen = s.wordlen) /\
               ((write_mem_word a n w s).lr = s.lr) /\
               ((write_mem_word a n w s).align = s.align) /\
               ((write_mem_word a n w s).mem_domain = s.mem_domain)`,
@@ -341,7 +344,8 @@ Theorem binop_upd_consts[simp]:
    ((binop_upd a b c d x).failed = x.failed) ∧
    ((binop_upd a b c d x).mem = x.mem) ∧
    ((binop_upd a b c d x).lr = x.lr) ∧
-   ((binop_upd a b c d x).be = x.be)
+   ((binop_upd a b c d x).be = x.be) ∧
+   ((binop_upd a b c d x).wordlen = x.wordlen)
 Proof
   Cases_on`b`>>EVAL_TAC
 QED
@@ -351,7 +355,8 @@ Theorem arith_upd_consts[simp]:
    ((arith_upd a x).align = x.align) ∧
    ((arith_upd a x).mem = x.mem) ∧
    ((arith_upd a x).lr = x.lr) ∧
-   ((arith_upd a x).be = x.be)
+   ((arith_upd a x).be = x.be) ∧
+   ((arith_upd a x).wordlen = x.wordlen)
 Proof
   Cases_on`a` >> EVAL_TAC >> srw_tac[][]
 QED
@@ -361,7 +366,8 @@ Theorem fp_upd_consts[simp]:
    ((fp_upd a x).align = x.align) ∧
    ((fp_upd a x).mem = x.mem) ∧
    ((fp_upd a x).lr = x.lr) ∧
-   ((fp_upd a x).be = x.be)
+   ((fp_upd a x).be = x.be) ∧
+   ((fp_upd a x).wordlen = x.wordlen)
 Proof
   Cases_on`a`
   \\ rpt (EVAL_TAC \\ srw_tac[][] \\ CASE_TAC \\ rw [])
@@ -369,6 +375,7 @@ QED
 
 Theorem asm_consts[simp]:
    !i w s. ((asm i w s).be = s.be) /\
+            ((asm i w s).wordlen = s.wordlen) /\
             ((asm i w s).lr = s.lr) /\
             ((asm i w s).align = s.align) /\
             ((asm i w s).mem_domain = s.mem_domain)
@@ -391,7 +398,8 @@ Theorem RTC_asm_step_consts:
   ⇒ (s2.mem_domain = s1.mem_domain) ∧
     (s2.lr = s1.lr) ∧
     (s2.align = s1.align) ∧
-    (s2.be = s1.be)
+    (s2.be = s1.be) ∧
+    (s2.wordlen = s1.wordlen)
 Proof
   rw[]
   \\ first_assum(mp_then (Pat`RTC`) mp_tac (GEN_ALL RTC_lifts_invariants))

@@ -28,7 +28,7 @@ QED
 val _ = Datatype `
   prog = Skip
        | Move num ((num # num) list)
-       | Inst ('a inst)
+       | Inst inst
        | Assign num ('a exp)
        | Get num store_name
        | Set store_name ('a exp)
@@ -41,7 +41,7 @@ val _ = Datatype `
               ((num # wordLang$prog # num # num) option)
               (* handler: varname, exception-handler code, labels l1,l2*)
        | Seq wordLang$prog wordLang$prog
-       | If cmp num ('a reg_imm) wordLang$prog wordLang$prog
+       | If cmp num reg_imm wordLang$prog wordLang$prog
        | Alloc num num_set
        | Raise num
        | Return num num
@@ -96,12 +96,8 @@ val every_var_inst_def = Define`
   (every_var_inst P (FP (FPLess r d1 d2)) = P r) ∧
   (every_var_inst P (FP (FPLessEqual r d1 d2)) = P r) ∧
   (every_var_inst P (FP (FPEqual r d1 d2)) = P r) ∧
-  (every_var_inst P (FP (FPMovToReg r1 r2 d):'a inst) =
-    if dimindex(:'a) = 64 then P r1
-    else (P r1 ∧ P r2)) ∧
-  (every_var_inst P (FP (FPMovFromReg d r1 r2)) =
-    if dimindex(:'a) = 64 then P r1
-    else (P r1 ∧ P r2)) ∧
+  (every_var_inst P (FP (FPMovToReg r1 r2 d)) = (P r1 ∧ P r2)) ∧
+  (every_var_inst P (FP (FPMovFromReg d r1 r2)) = (P r1 ∧ P r2)) ∧
   (every_var_inst P inst = T)` (*catchall*)
 
 val every_name_def = Define`
@@ -202,12 +198,8 @@ val max_var_inst_def = Define`
   (max_var_inst (FP (FPLess r f1 f2)) = r) ∧
   (max_var_inst (FP (FPLessEqual r f1 f2)) = r) ∧
   (max_var_inst (FP (FPEqual r f1 f2)) = r) ∧
-  (max_var_inst (FP (FPMovToReg r1 r2 d):'a inst) =
-    if dimindex(:'a) = 64 then r1
-    else MAX r1 r2) ∧
-  (max_var_inst (FP (FPMovFromReg d r1 r2)) =
-    if dimindex(:'a) = 64 then r1
-    else MAX r1 r2) ∧
+  (max_var_inst (FP (FPMovToReg r1 r2 d)) = MAX r1 r2) ∧
+  (max_var_inst (FP (FPMovFromReg d r1 r2)) = MAX r1 r2) ∧
   (max_var_inst _ = 0)`
 
 val max_var_def = Define `

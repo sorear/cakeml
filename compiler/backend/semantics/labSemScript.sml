@@ -62,7 +62,7 @@ val assert_def = Define `assert b s = s with failed := (~b \/ s.failed)`
 
 val reg_imm_def = Define `
   (reg_imm (Reg r) s = read_reg r s) /\
-  (reg_imm (Imm w) s = Word w)`
+  (reg_imm (Imm w) s = Word (w2w w))`
 val _ = export_rewrites["reg_imm_def"];
 
 val binop_upd_def = Define `
@@ -86,8 +86,8 @@ val word_cmp_def = Define `
   (word_cmp _ _ _ = NONE)`
 
 val arith_upd_def = Define `
-  (arith_upd (Binop b r1 r2 (ri:'a reg_imm)) s =
-     case (read_reg r2 s, reg_imm ri s) of
+  (arith_upd (Binop b r1 r2 (ri:reg_imm)) (s:('a,'c,'ffi) state) =
+     case (read_reg r2 s, labSem$reg_imm ri s) of
      | (Word w1, Word w2) => binop_upd r1 b w1 w2 s
      | (x,_) => if b = Or /\ ri = Reg r2 then upd_reg r1 x s else assert F s) /\
   (arith_upd (Shift l r1 r2 n) s =
@@ -176,12 +176,12 @@ val fp_upd_def = Define `
      upd_fp_reg d1
        (fpSem$fpfma (read_fp_reg d1 s) (read_fp_reg d2 s) (read_fp_reg d3 s)) s) /\
   (fp_upd (FPMovToReg r1 r2 d) s =
-     if dimindex(:'a) = 64 then
+     if r1 = r2 then
        upd_reg r1 (Word (w2w (read_fp_reg d s))) s
      else let v = read_fp_reg d s in
        upd_reg r2 (Word ((63 >< 32) v)) (upd_reg r1 (Word ((31 >< 0) v)) s)) /\
   (fp_upd (FPMovFromReg d r1 r2) s =
-     if dimindex(:'a) = 64 then
+     if r1 = r2 then
        case read_reg r1 s of
          Word w1 => upd_fp_reg d (w2w w1) s
        | _ => assert F s
@@ -211,7 +211,7 @@ val fp_upd_def = Define `
 val addr_def = Define `
   addr (Addr r offset) s =
     case read_reg r s of
-    | Word w => SOME (w + offset)
+    | Word w => SOME (w + w2w offset)
     | _ => NONE`
 
 val is_Loc_def = Define `(is_Loc (Loc _ _) = T) /\ (is_Loc _ = F)`;
@@ -258,12 +258,12 @@ val mem_op_def = Define `
   (mem_op Store r a = mem_store r a) /\
   (mem_op Load8 r a = mem_load_byte r a) /\
   (mem_op Store8 r a = mem_store_byte r a) /\
-  (mem_op Load32 r (a:'a addr) = assert F) /\
-  (mem_op Store32 r (a:'a addr) = assert F)`;
+  (mem_op Load32 r (a:addr) = assert F) /\
+  (mem_op Store32 r (a:addr) = assert F)`;
 
 val asm_inst_def = Define `
   (asm_inst Skip s = (s:('a,'c,'ffi) labSem$state)) /\
-  (asm_inst (Const r imm) s = upd_reg r (Word imm) s) /\
+  (asm_inst (Const r imm) s = upd_reg r (Word (w2w imm)) s) /\
   (asm_inst (Arith x) s = arith_upd x s) /\
   (asm_inst (Mem m r a) s = mem_op m r a s) /\
   (asm_inst (FP fp) s = fp_upd fp s)`;

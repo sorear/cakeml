@@ -18,6 +18,7 @@ val () = Datatype `
      ; pc         : 'a word
      ; lr         : reg
      ; align      : num
+     ; wordlen    : num
      ; be         : bool
      ; failed     : bool
      |>`
@@ -34,7 +35,7 @@ val assert_def = Define `assert b s = s with failed := (~b \/ s.failed)`
 
 val reg_imm_def = Define `
   (reg_imm (Reg r) s = read_reg r s) /\
-  (reg_imm (Imm w) s = w)`
+  (reg_imm (Imm w) s = w2w w)`
 
 val binop_upd_def = Define `
   (binop_upd r Add w1 w2 = upd_reg r (w1 + w2)) /\
@@ -52,7 +53,7 @@ val word_shift_def = Define `
   (word_shift Ror w n = word_ror w n)`;
 
 val arith_upd_def = Define `
-  (arith_upd (Binop b r1 r2 (ri:'a reg_imm)) s =
+  (arith_upd (Binop b r1 r2 ri) s =
      binop_upd r1 b (read_reg r2 s) (reg_imm ri s) s) /\
   (arith_upd (Shift l r1 r2 n) s =
      upd_reg r1 (word_shift l (read_reg r2 s) n) s) /\
@@ -152,7 +153,7 @@ val fp_upd_def = Define `
      in
        upd_fp_reg d1 (int_to_fp64 roundTiesToEven i) s)`
 
-val addr_def = Define `addr (Addr r offset) s = read_reg r s + offset`
+val addr_def = Define `addr (Addr r offset) s = read_reg r s + w2w offset`
 
 val read_mem_word_def = Define `
   (read_mem_word a 0 s = (0w:'a word,s)) /\
@@ -182,16 +183,16 @@ val mem_store_def = Define `
       assert (aligned (LOG2 n) a) s`
 
 val mem_op_def = Define `
-  (mem_op Load r a = mem_load (dimindex (:'a) DIV 8) r a) /\
-  (mem_op Store r a = mem_store (dimindex (:'a) DIV 8) r a) /\
-  (mem_op Load8 r a = mem_load 1 r a) /\
-  (mem_op Store8 r a = mem_store 1 r a) /\
-  (mem_op Load32 r (a:'a addr) = mem_load 4 r a) /\
-  (mem_op Store32 r (a:'a addr) = mem_store 4 r a)`
+  (mem_op Load r a s = mem_load (s.wordlen DIV 8) r a s) /\
+  (mem_op Store r a s = mem_store (s.wordlen DIV 8) r a s) /\
+  (mem_op Load8 r a s = mem_load 1 r a s) /\
+  (mem_op Store8 r a s = mem_store 1 r a s) /\
+  (mem_op Load32 r a s = mem_load 4 r a s) /\
+  (mem_op Store32 r a s = mem_store 4 r a s)`
 
 val inst_def = Define `
   (inst Skip s = s) /\
-  (inst (Const r imm) s = upd_reg r imm s) /\
+  (inst (Const r imm) s = upd_reg r (w2w imm) s) /\
   (inst (Arith x) s = arith_upd x s) /\
   (inst (Mem m r a) s = mem_op m r a s) /\
   (inst (FP fp) s = fp_upd fp s)`

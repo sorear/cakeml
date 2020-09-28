@@ -16,10 +16,10 @@ val ffi_offset_def = Define `
 (* basic assemble function *)
 
 val lab_inst_def = Define `
-  (lab_inst w (Jump _) = Jump w) /\
+  (lab_inst (w:word64) (Jump _) = Jump w) /\
   (lab_inst w (JumpCmp c r ri _) = JumpCmp c r ri w) /\
   (lab_inst w (Call _) = Call w) /\
-  (lab_inst w (LocValue r _) = Loc r (w:'a word)) /\
+  (lab_inst w (LocValue r _) = Loc r w) /\
   (lab_inst w (Halt) = Jump w) /\
   (lab_inst w (Install) = Jump w) /\
   (lab_inst w (CallFFI n) = Jump w)`;
@@ -148,7 +148,7 @@ val upd_lab_len_def = Define `
 (* checking that all labelled asm instructions are asm_ok *)
 
 val line_ok_light_def = Define `
-  (line_ok_light (c:'a asm_config) (Label _ _ l) <=> T) /\
+  (line_ok_light (c:asm_config) (Label _ _ l) <=> T) /\
   (line_ok_light c (Asm b bytes l) <=> T) /\
   (line_ok_light c (LabAsm Halt w bytes l) <=>
      asm_ok (Jump w) c) /\
@@ -318,7 +318,7 @@ val _ = Datatype`
   config = <| labels : num num_map num_map
             ; sec_pos_len : (num # num # num) list
             ; pos : num
-            ; asm_conf : 'a asm_config
+            ; asm_conf : asm_config
             ; init_clock : num
             ; ffi_names : string list option
             ; hash_size : num

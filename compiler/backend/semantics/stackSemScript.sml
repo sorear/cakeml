@@ -87,8 +87,8 @@ val _ = Datatype `
      ; memory  : 'a word -> 'a word_loc
      ; mdomain : ('a word) set
      ; bitmaps : 'a word list
-     ; compile : 'c -> (num # 'a stackLang$prog) list -> (word8 list # 'c) option
-     ; compile_oracle : num -> 'c # (num # 'a stackLang$prog) list # 'a word list
+     ; compile : 'c -> (num # stackLang$prog) list -> (word8 list # 'c) option
+     ; compile_oracle : num -> 'c # (num # stackLang$prog) list # 'a word list
      ; code_buffer : ('a,8) buffer
      ; data_buffer : ('a,'a) buffer
      ; gc_fun  : 'a gc_fun_type
@@ -96,7 +96,7 @@ val _ = Datatype `
      ; use_store : bool
      ; use_alloc : bool
      ; clock   : num
-     ; code    : ('a stackLang$prog) num_map
+     ; code    : stackLang$prog num_map
      ; ffi     : 'ffi ffi_state
      ; ffi_save_regs : num set
      ; be      : bool (* is big-endian *) |> `
@@ -267,7 +267,7 @@ val inst_def = Define `
   inst i (s:('a,'c,'ffi) stackSem$state) =
     case i of
     | Skip => SOME s
-    | Const reg w => assign reg (Const w) s
+    | Const reg w => assign reg (Const (w2w w)) s
     | Arith (Binop bop r1 r2 ri) =>
         if bop = Or /\ ri = Reg r2 then
           case FLOOKUP s.regs r2 of
@@ -276,7 +276,7 @@ val inst_def = Define `
         else
           assign r1
             (Op bop [Var r2; case ri of Reg r3 => Var r3
-                                      | Imm w => Const w]) s
+                                      | Imm w => Const (w2w w)]) s
     | Arith (Shift sh r1 r2 n) =>
         assign r1
           (Shift sh (Var r2) n) s
@@ -330,28 +330,28 @@ val inst_def = Define `
          else NONE
       | _ => NONE)
     | Mem Load r (Addr a w) =>
-       (case word_exp s (Op Add [Var a; Const w]) of
+       (case word_exp s (Op Add [Var a; Const (w2w w)]) of
         | NONE => NONE
         | SOME w =>
             case mem_load w s of
             | NONE => NONE
             | SOME w => SOME (set_var r w s))
     | Mem Load8 r (Addr a w) =>
-       (case word_exp s (Op Add [Var a; Const w]) of
+       (case word_exp s (Op Add [Var a; Const (w2w w)]) of
         | SOME w =>
            (case mem_load_byte_aux s.memory s.mdomain s.be w of
             | NONE => NONE
             | SOME w => SOME (set_var r (Word (w2w w)) s))
         | _ => NONE)
     | Mem Store r (Addr a w) =>
-       (case (word_exp s (Op Add [Var a; Const w]), get_var r s) of
+       (case (word_exp s (Op Add [Var a; Const (w2w w)]), get_var r s) of
         | (SOME a, SOME w) =>
             (case mem_store a w s of
              | SOME s1 => SOME s1
              | NONE => NONE)
         | _ => NONE)
     | Mem Store8 r (Addr a w) =>
-       (case (word_exp s (Op Add [Var a; Const w]), get_var r s) of
+       (case (word_exp s (Op Add [Var a; Const (w2w w)]), get_var r s) of
         | (SOME a, SOME (Word w)) =>
             (case mem_store_byte_aux s.memory s.mdomain s.be a (w2w w) of
              | SOME new_m => SOME (s with memory := new_m)
@@ -478,8 +478,8 @@ val inst_def = Define `
     | _ => NONE`
 
 val get_var_imm_def = Define`
-  (get_var_imm ((Reg n):'a reg_imm) s = get_var n s) /\
-  (get_var_imm (Imm w) s = SOME(Word w))`
+  (get_var_imm (Reg n) s = get_var n s) /\
+  (get_var_imm (Imm w) s = SOME(Word (w2w w)))`
 
 val find_code_def = Define `
   (find_code (INL p) regs code = sptree$lookup p code) /\
@@ -516,12 +516,12 @@ val loc_check_def = Define `
     ?n e. lookup n code = SOME e /\ (l1,l2) IN get_labels e`;
 
 Definition dest_Seq_def:
-  dest_Seq (Seq p1 p2) = SOME (p1,p2:'a stackLang$prog) /\
+  dest_Seq (Seq p1 p2) = SOME (p1,p2:stackLang$prog) /\
   dest_Seq _ = NONE
 End
 
 val evaluate_def = tDefine "evaluate" `
-  (evaluate (Skip:'a stackLang$prog,s) = (NONE,s:('a,'c,'ffi) stackSem$state)) /\
+  (evaluate (Skip:stackLang$prog,s) = (NONE,s:('a,'c,'ffi) stackSem$state)) /\
   (evaluate (Halt v,s) =
      case get_var v s of
      | SOME w => (SOME (Halt w), empty_env s)
@@ -754,7 +754,7 @@ val evaluate_def = tDefine "evaluate" `
          if LENGTH s.bitmaps <= w2n w then (SOME Error,s)
          else (NONE, set_var r (Word (EL (w2n w) s.bitmaps)) s)
      | _ => (SOME Error,s))`
-  (WF_REL_TAC `(inv_image (measure I LEX measure (prog_size (K 0)))
+  (WF_REL_TAC `(inv_image (measure I LEX measure prog_size)
                              (\(xs,(s:('a,'c,'ffi) stackSem$state)). (s.clock,xs)))`
    \\ rpt strip_tac
    \\ fs[empty_env_def,dec_clock_def,set_var_def,STOP_def]

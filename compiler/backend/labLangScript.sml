@@ -19,7 +19,7 @@ val () = Datatype `
 
 val () = Datatype `
   asm_with_lab = Jump lab
-               | JumpCmp cmp reg ('a reg_imm) lab
+               | JumpCmp cmp reg reg_imm lab
                | Call lab
                | LocValue reg lab
                (* following have no label, but have similar semantics *)
@@ -28,12 +28,12 @@ val () = Datatype `
                | Halt`;
 
 val _ = Datatype`
-  asm_or_cbw = Asmi ('a asm) | Cbw reg reg`; (* Either an asm inst/jumpreg or code-buffer-write *)
+  asm_or_cbw = Asmi asm | Cbw reg reg`; (* Either an asm inst/jumpreg or code-buffer-write *)
 
 val () = Datatype `
   line = Label num num num (* section number, label number, length *)
-       | Asm ('a asm_or_cbw) (word8 list) num (* instruction, encoded instruction, length *)
-       | LabAsm ('a asm_with_lab) ('a word) (word8 list) num`
+       | Asm asm_or_cbw (word8 list) num (* instruction, encoded instruction, length *)
+       | LabAsm asm_with_lab ('a word) (word8 list) num`
                                   (* position, encoded instruction, length *)
 
 (* A section consists a name (num) and a list of assembly lines. *)

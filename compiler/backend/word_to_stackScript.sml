@@ -76,7 +76,7 @@ val wMove_def = Define `
     wMoveAux (MAP (format_var k ## format_var k) (parmove (MAP (DIV2 ## DIV2) xs))) (k,f,f')`;
 
 val wInst_def = Define `
-  (wInst ((Const n c):'a inst) kf =
+  (wInst ((Const n c):inst) kf =
     wRegWrite1 (\n. Inst (Const n c)) n kf) /\
   (wInst (Arith (Binop bop n1 n2 (Imm imm))) kf =
     let (l,n2) = wReg1 n2 kf in
@@ -144,7 +144,7 @@ val wInst_def = Define `
   (wInst (FP (FPEqual r f1 f2)) kf =
     wRegWrite1 (\r. Inst (FP (FPEqual r f1 f2))) r kf) /\
   (wInst (FP (FPMovToReg r1 r2 d)) kf =
-    if dimindex(:'a) = 64 then
+    if r1 = r2 then
       wRegWrite1 (λr1. Inst (FP (FPMovToReg r1 0 d))) r1 kf
     else
       wRegWrite2 (λr2. wRegWrite1 (λr1. Inst(FP (FPMovToReg r1 r2 d))) r1 kf) r2 kf) /\

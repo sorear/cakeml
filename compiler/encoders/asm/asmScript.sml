@@ -70,10 +70,10 @@ val () = new_theory "asm"
 
 Type reg = ``:num``
 Type fp_reg = ``:num``
-Type imm = ``:'a word``
+Type imm = ``:64 word``
 
 val () = Datatype `
-  reg_imm = Reg reg | Imm ('a imm)`
+  reg_imm = Reg reg | Imm imm`
 
 val () = Datatype `
   binop = Add | Sub | And | Or | Xor`
@@ -82,7 +82,7 @@ val () = Datatype `
   cmp = Equal | Lower | Less | Test | NotEqual | NotLower | NotLess | NotTest`
 
 val () = Datatype `
-  arith = Binop binop reg reg ('a reg_imm)
+  arith = Binop binop reg reg reg_imm
         | Shift shift reg reg num
         | Div reg reg reg
         | LongMul reg reg reg reg
@@ -115,7 +115,7 @@ val () = Datatype `
      | FPFromInt fp_reg fp_reg`
 
 val () = Datatype `
-  addr = Addr reg ('a word)`
+  addr = Addr reg (64 word)`
 
 (* old version
 val () = Datatype `
@@ -128,18 +128,18 @@ val () = Datatype `
 
 val () = Datatype `
   inst = Skip
-       | Const reg ('a word)
-       | Arith ('a arith)
-       | Mem memop reg ('a addr)
+       | Const reg (64 word)
+       | Arith arith
+       | Mem memop reg addr
        | FP fp`
 
 val () = Datatype `
-  asm = Inst ('a inst)
-      | Jump ('a word)
-      | JumpCmp cmp reg ('a reg_imm) ('a word)
-      | Call ('a word)
+  asm = Inst inst
+      | Jump (64 word)
+      | JumpCmp cmp reg reg_imm (64 word)
+      | Call (64 word)
       | JumpReg reg
-      | Loc reg ('a word)`
+      | Loc reg (64 word)`
 
 (* -- ASM target-specific configuration -- *)
 
@@ -149,20 +149,21 @@ val () = Datatype `
 val () = Datatype `
   asm_config =
     <| ISA            : architecture
-     ; encode         : 'a asm -> word8 list
+     ; encode         : asm -> word8 list
      ; big_endian     : bool
+     ; word_length    : num
      ; code_alignment : num
      ; link_reg       : num option
      ; avoid_regs     : num list
      ; reg_count      : num
      ; fp_reg_count   : num  (* set to 0 if float not available *)
      ; two_reg_arith  : bool
-     ; valid_imm      : (binop + cmp) -> 'a word -> bool
-     ; addr_offset    : 'a word # 'a word
-     ; byte_offset    : 'a word # 'a word
-     ; jump_offset    : 'a word # 'a word
-     ; cjump_offset   : 'a word # 'a word
-     ; loc_offset     : 'a word # 'a word
+     ; valid_imm      : (binop + cmp) -> 64 word -> bool
+     ; addr_offset    : 64 word # 64 word
+     ; byte_offset    : 64 word # 64 word
+     ; jump_offset    : 64 word # 64 word
+     ; cjump_offset   : 64 word # 64 word
+     ; loc_offset     : 64 word # 64 word
      |>`
 
 val reg_ok_def = Define `
@@ -185,10 +186,10 @@ val arith_ok_def = Define `
               "Or" on "two_reg_arith" architectures. *)
      (c.two_reg_arith ==> (r1 = r2) \/ (b = Or) /\ (ri = Reg r2)) /\
      reg_ok r1 c /\ reg_ok r2 c /\ reg_imm_ok (INL b) ri c) /\
-  (arith_ok (Shift l r1 r2 n) (c: 'a asm_config) <=>
+  (arith_ok (Shift l r1 r2 n) (c: asm_config) <=>
      (c.two_reg_arith ==> (r1 = r2)) /\
      reg_ok r1 c /\ reg_ok r2 c /\
-     ((n = 0) ==> (l = Lsl)) /\ n < dimindex(:'a)) /\
+     ((n = 0) ==> (l = Lsl)) /\ n < c.word_length) /\
   (arith_ok (Div r1 r2 r3) c <=>
      reg_ok r1 c /\ reg_ok r2 c /\ reg_ok r3 c /\
      c.ISA IN {ARMv8; MIPS; RISC_V}) /\
@@ -242,11 +243,11 @@ val fp_ok_def = Define `
       2 < c.fp_reg_count /\
       fp_reg_ok d1 c /\ fp_reg_ok d2 c /\ fp_reg_ok d3 c) /\
   (fp_ok (FPMov d1 d2) c <=> fp_reg_ok d1 c /\ fp_reg_ok d2 c) /\
-  (fp_ok (FPMovToReg r1 r2 d) (c : 'a asm_config) <=>
-      reg_ok r1 c /\ ((dimindex(:'a) = 32) ==> r1 <> r2 /\ reg_ok r2 c) /\
+  (fp_ok (FPMovToReg r1 r2 d) c <=>
+      reg_ok r1 c /\ ((c.word_length = 32) ==> r1 <> r2 /\ reg_ok r2 c) /\
       fp_reg_ok d c) /\
-  (fp_ok (FPMovFromReg d r1 r2) (c : 'a asm_config) <=>
-      reg_ok r1 c /\ ((dimindex(:'a) = 32) ==> r1 <> r2 /\ reg_ok r2 c) /\
+  (fp_ok (FPMovFromReg d r1 r2) c <=>
+      reg_ok r1 c /\ ((c.word_length = 32) ==> r1 <> r2 /\ reg_ok r2 c) /\
       fp_reg_ok d c) /\
   (fp_ok (FPToInt r d) c <=> fp_reg_ok r c /\ fp_reg_ok d c) /\
   (fp_ok (FPFromInt d r) c <=> fp_reg_ok r c /\ fp_reg_ok d c)`
@@ -270,7 +271,7 @@ val inst_ok_def = Define `
   (inst_ok (Const r w) c = reg_ok r c) /\
   (inst_ok (Arith x) c = arith_ok x c) /\
   (inst_ok (FP x) c = fp_ok x c) /\
-  (inst_ok (Mem m r1 (Addr r2 w) : 'a inst) c <=>
+  (inst_ok (Mem m r1 (Addr r2 w)) c <=>
      reg_ok r1 c /\ reg_ok r2 c /\
      (if m IN {Load; Store} then
         addr_offset_ok c w

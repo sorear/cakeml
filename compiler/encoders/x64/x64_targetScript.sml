@@ -217,6 +217,7 @@ val x64_config_def = Define`
     ; link_reg := NONE
     ; two_reg_arith := T
     ; big_endian := F
+    ; word_length := 64
     ; valid_imm := \b i. ^min32 <= i /\ i <= ^max32
     ; addr_offset := (^min32, ^max32)
     ; byte_offset := (^min32, ^max32)

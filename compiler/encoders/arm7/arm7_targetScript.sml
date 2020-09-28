@@ -94,10 +94,11 @@ val arm7_enc_def = Define`
       (* >= ARMv6T2 has dedicated NOP but using MOV r0, r0 instead. *)
       enc (Data (ShiftImmediate (F, F, 0w, 0w, SRType_LSL, 0)))) /\
    (arm7_enc (Inst (Const r i)) =
-      case EncodeARMImmediate i of
+      let i32 = w2w i in
+      case EncodeARMImmediate i32 of
          SOME imm12 => enc (Data (Move (F, F, n2w r, imm12)))
        | NONE =>
-           (case EncodeARMImmediate (~i) of
+           (case EncodeARMImmediate (~i32) of
                SOME imm12 => enc (Data (Move (F, T, n2w r, imm12)))
              | NONE =>
                  arm7_encode [(AL, Load (LoadLiteral (T, n2w r, 0w)));
@@ -110,7 +111,7 @@ val arm7_enc_def = Define`
       if (bop = Xor) /\ (i = -1w) then
         enc (Data (ShiftImmediate (T, F, n2w r1, n2w r2, SRType_LSL, 0)))
       else
-        case EncodeARMImmediate i of
+        case EncodeARMImmediate (w2w i) of
            SOME imm12 =>
              enc (Data (ArithLogicImmediate
                            (arm7_bop bop, F, n2w r1, n2w r2, imm12)))
@@ -140,21 +141,21 @@ val arm7_enc_def = Define`
          (VC, Data (Move (F, F, n2w r4, 0w)));
          (VS, Data (Move (F, F, n2w r4, 1w)))]) /\
    (arm7_enc (Inst (Mem Load r1 (Addr r2 a))) =
-      let (add, imm12) = if 0w <= a then (T, a) else (F, -a) in
+      let (add, imm12) = if 0w <= a then (T, w2w a) else (F, -w2w a) in
       enc (Load (LoadWord (add, T, F, n2w r1, n2w r2,
                            immediate_form1 imm12)))) /\
    (* (arm7_enc (Inst (Mem Load32 _ _)) = arm7_encode_fail) /\ *)
    (arm7_enc (Inst (Mem Load8 r1 (Addr r2 a))) =
-      let (add, imm12) = if 0w <= a then (T, a) else (F, -a) in
+      let (add, imm12) = if 0w <= a then (T, w2w a) else (F, -w2w a) in
       enc (Load (LoadByte (T, add, T, F, n2w r1, n2w r2,
                            immediate_form1 imm12)))) /\
    (arm7_enc (Inst (Mem Store r1 (Addr r2 a))) =
-      let (add, imm12) = if 0w <= a then (T, a) else (F, -a) in
+      let (add, imm12) = if 0w <= a then (T, w2w a) else (F, -w2w a) in
       enc (Store (StoreWord (add, T, F, n2w r1, n2w r2,
                              immediate_form1 imm12)))) /\
    (* (arm7_enc (Inst (Mem Store32 r1 (Addr r2 a))) = arm7_encode_fail) /\ *)
    (arm7_enc (Inst (Mem Store8 r1 (Addr r2 a))) =
-      let (add, imm12) = if 0w <= a then (T, a) else (F, -a) in
+      let (add, imm12) = if 0w <= a then (T, w2w a) else (F, -w2w a) in
       enc (Store (StoreByte (add, T, F, n2w r1, n2w r2,
                              immediate_form1 imm12)))) /\
    (arm7_enc (Inst (FP (FPLess n d1 d2))) = arm7_vfp_cmp LT n d1 d2) /\
@@ -187,26 +188,27 @@ val arm7_enc_def = Define`
       enc (VFP (vcvt_to_integer (T, F, F, n2w d1, n2w d2)))) /\
    (arm7_enc (Inst (FP (FPFromInt d1 d2))) =
       enc (VFP (vcvt_from_integer (T, F, n2w d1, n2w d2)))) /\
-   (arm7_enc (Jump a) = enc (Branch (BranchTarget (a - 8w)))) /\
+   (arm7_enc (Jump a) = enc (Branch (BranchTarget (w2w a - 8w)))) /\
    (arm7_enc (JumpCmp cmp r1 (Reg r2) a) =
       let (opc, c) = arm7_cmp cmp in
       arm7_encode
         [(AL, Data (TestCompareRegister (opc, n2w r1, n2w r2, SRType_LSL, 0)));
-         (c, Branch (BranchTarget (a - 12w)))]) /\
+         (c, Branch (BranchTarget ((w2w a):word32 - 12w)))]) /\
    (arm7_enc (JumpCmp cmp r (Imm i) a) =
       let (opc, c) = arm7_cmp cmp
       in
-        case EncodeARMImmediate i of
+        case EncodeARMImmediate (w2w i) of
            SOME imm12 =>
               arm7_encode
                 [(AL, Data (TestCompareImmediate (opc, n2w r, imm12)));
-                 (c, Branch (BranchTarget (a - 12w)))]
+                 (c, Branch (BranchTarget ((w2w a):word32 - 12w)))]
          | NONE => arm7_encode_fail) /\
    (arm7_enc (Call a) =
-      enc (Branch (BranchLinkExchangeImmediate (InstrSet_ARM, a - 8w)))) /\
+      enc (Branch (BranchLinkExchangeImmediate (InstrSet_ARM, (w2w a):word32 - 8w)))) /\
    (arm7_enc (JumpReg r) = enc (Branch (BranchExchange (n2w r)))) /\
    (arm7_enc (Loc r i) =
-      let (opc, imm32) = if 8w <= i then (4w, i - 8w) else (2w, 8w - i) in
+      let i32 = (w2w i): word32 in
+      let (opc, imm32) = if 8w <= i32 then (4w, i32 - 8w) else (2w, 8w - i32) in
       let imm32b3 = (31 >< 24) imm32 : word8
       and imm32b2 = (23 >< 16) imm32 : word8
       and imm32b1 = (15 >< 8) imm32 : word8
@@ -251,7 +253,8 @@ val arm7_config_def = Define`
     ; link_reg := SOME 14
     ; two_reg_arith := F
     ; big_endian := F
-    ; valid_imm := \c i. valid_immediate i
+    ; word_length := 32
+    ; valid_imm := \c i. valid_immediate (w2w i:word32)
     ; addr_offset := (^min12, ^max12)
     ; byte_offset := (^min12, ^max12)
     ; jump_offset := (^min26 + 8w, ^max26 + 8w)

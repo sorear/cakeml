@@ -90,7 +90,7 @@ val stack_free_def = tDefine "stack_free" `
 val upshift_def = tDefine"upshift"`
   upshift r n =
     if n ≤ max_stack_alloc then
-      (Inst (Arith (Binop Add r r (Imm (word_offset n))))):'a stackLang$prog
+      (Inst (Arith (Binop Add r r (Imm (word_offset n))))):stackLang$prog
     else
       Seq (Inst (Arith (Binop Add r r (Imm (word_offset max_stack_alloc)))))
       (upshift r (n-max_stack_alloc))`
@@ -99,7 +99,7 @@ val upshift_def = tDefine"upshift"`
 val downshift_def = tDefine"downshift"`
   downshift r n =
     if n ≤ max_stack_alloc then
-      (Inst (Arith (Binop Sub r r (Imm (word_offset n))))) :'a stackLang$prog
+      (Inst (Arith (Binop Sub r r (Imm (word_offset n))))) :stackLang$prog
     else
       Seq (Inst (Arith (Binop Sub r r (Imm (word_offset max_stack_alloc)))))
       (downshift r (n-max_stack_alloc))`
@@ -113,10 +113,16 @@ val stack_store_def = Define`
 
 val stack_load_def = Define`
   stack_load r n =
-    Seq (upshift r n) (Inst (Mem Load r (Addr r 0w))):'a stackLang$prog`
+    Seq (upshift r n) (Inst (Mem Load r (Addr r 0w))):stackLang$prog`
+
+val _ = Datatype`config =
+  <| word_shift : num
+   ; word_length : num
+   ; jump : bool (* whether to compile to JumpLower or If Lower ... in stack_remove*)
+   |>`;
 
 val comp_def = Define `
-  comp jump off k (p:'a stackLang$prog) =
+  comp (c:stack_remove$config) off k (p:stackLang$prog) =
     case p of
     (* remove store accesses *)
     | Get r name =>
@@ -127,7 +133,7 @@ val comp_def = Define `
         else Inst (Mem Store r (Addr (k+1) (store_offset name)))
     (* remove stack operations *)
     | StackFree n => stack_free k n
-    | StackAlloc n => stack_alloc jump k n
+    | StackAlloc n => stack_alloc c.jump k n
     | StackStore r n =>
       let w = word_offset n in
       if offset_ok 0 off w then
@@ -147,29 +153,29 @@ val comp_def = Define `
                           (Seq (Inst (Mem Store r (Addr k 0w)))
                                (Inst (Arith (Binop Sub k k (Reg i)))))
     | StackGetSize r => Seq (Seq (move r k) (sub_inst r (k+1)))
-                            (right_shift_inst r (word_shift (:'a)))
-    | StackSetSize r => Seq (left_shift_inst r (word_shift (:'a)))
+                            (right_shift_inst r c.word_shift)
+    | StackSetSize r => Seq (left_shift_inst r c.word_shift)
                             (Seq (move k (k+1)) (add_inst k r))
     | BitmapLoad r v =>
         list_Seq [Inst (Mem Load r (Addr (k+1) (store_offset BitmapBase)));
                   add_inst r v;
-                  left_shift_inst r (word_shift (:'a));
+                  left_shift_inst r c.word_shift;
                   Inst (Mem Load r (Addr r 0w))]
     (* for the rest, just leave it unchanged *)
-    | Seq p1 p2 => Seq (comp jump off k p1) (comp jump off k p2)
-    | If c r ri p1 p2 => If c r ri (comp jump off k p1) (comp jump off k p2)
-    | While c r ri p1 => While c r ri (comp jump off k p1)
+    | Seq p1 p2 => Seq (comp c off k p1) (comp c off k p2)
+    | If co r ri p1 p2 => If co r ri (comp c off k p1) (comp c off k p2)
+    | While co r ri p1 => While co r ri (comp c off k p1)
     | Call ret dest exc =>
         Call (case ret of
               | NONE => NONE
-              | SOME (p1,lr,l1,l2) => SOME (comp jump off k p1,lr,l1,l2))
+              | SOME (p1,lr,l1,l2) => SOME (comp c off k p1,lr,l1,l2))
           dest (case exc of
                 | NONE => NONE
-                | SOME (p2,l1,l2) => SOME (comp jump off k p2,l1,l2))
+                | SOME (p2,l1,l2) => SOME (comp c off k p2,l1,l2))
     | p => p`
 
 val prog_comp_def = Define `
-  prog_comp jump off k (n,p) = (n,comp jump off k p)`
+  prog_comp c off k (n,p) = (n,comp c off k p)`
 
 (* -- init code -- *)
 
@@ -213,24 +219,22 @@ val store_init_def = Define `
     reg 4: one past last address of stack *)
 
 val init_code_def = Define `
-  init_code gen_gc max_heap k =
-    let max_heap = (if max_heap * w2n (bytes_in_word:'a word) < dimword (:'a)
-                    then n2w max_heap * bytes_in_word
-                    else 0w-1w) in
+  init_code (conf:stack_remove$config) gen_gc max_heap k =
+    let max_heap = n2w max_heap in
       list_Seq [(* compute the middle address, store in reg0 *)
                 move 0 4;
                 sub_inst 0 2;
-                right_shift_inst 0 (1 + word_shift (:'a));
-                left_shift_inst 0 (word_shift (:'a));
+                right_shift_inst 0 (1 + conf.word_shift);
+                left_shift_inst 0 conf.word_shift;
                 add_inst 0 2;
                 (* if reg3 is not between start and end of memory, then put
                    it in the middle (i.e. split heap and stack evenly) *)
-                const_inst 5 (n2w max_stack_alloc * bytes_in_word:'a word);
+                const_inst 5 (n2w (max_stack_alloc * (conf.word_length DIV 8)));
                 add_inst 2 5;
                 sub_inst 4 5;
                 If Lower 3 (Reg 2) (move 3 0)
                   (If Lower 4 (Reg 3) (move 3 0) Skip);
-                const_inst 0 (n2w max_stack_alloc * bytes_in_word:'a word);
+                const_inst 0 (n2w (max_stack_alloc * (conf.word_length DIV 8)));
                 sub_inst 2 0;
                 add_inst 4 0;
                 (* shrink the heap if it is too big *)
@@ -240,8 +244,8 @@ val init_code_def = Define `
                 If Lower 5 (Reg 0) (Seq (move 3 2) (add_inst 3 5)) Skip;
                 (* ensure heap is even number of words *)
                 sub_inst 3 2;
-                right_shift_inst 3 (word_shift (:'a) + 1);
-                left_shift_inst 3 (word_shift (:'a) + 1);
+                right_shift_inst 3 (conf.word_shift + 1);
+                left_shift_inst 3 (conf.word_shift + 1);
                 add_inst 3 2;
                 (* split heap into two, store heap length in 5 *)
                 move 5 3;
@@ -253,7 +257,7 @@ val init_code_def = Define `
                 move k 4;
                 move (k+1) 3;
                 load_inst 3 (k+2);
-                right_shift_inst 3 (word_shift (:'a));
+                right_shift_inst 3 conf.word_shift;
                 move 0 (k+2);
                 add_bytes_in_word_inst 0;
                 load_inst 4 0;
@@ -267,8 +271,8 @@ val init_code_def = Define `
                 LocValue 0 1 0]`
 
 val init_stubs_def = Define `
-  init_stubs gen_gc max_heap k start =
-    [(0n,Seq (init_code gen_gc max_heap k) (Call NONE (INL start) NONE));
+  init_stubs conf gen_gc max_heap k start =
+    [(0n,Seq (init_code conf gen_gc max_heap k) (Call NONE (INL start) NONE));
      (1n,halt_inst 0w);
      (2n,halt_inst 2w)]`
 
@@ -288,8 +292,8 @@ QED
 (* -- full compiler -- *)
 
 val compile_def = Define `
-  compile jump off gen_gc max_heap k start prog =
-    init_stubs gen_gc max_heap k start ++
-    MAP (prog_comp jump off k) prog`;
+  compile conf off gen_gc max_heap k start prog =
+    init_stubs conf gen_gc max_heap k start ++
+    MAP (prog_comp conf off k) prog`;
 
 val _ = export_theory();

@@ -273,6 +273,7 @@ val arm8_config_def = Define`
     ; link_reg := SOME 30
     ; two_reg_arith := F
     ; big_endian := F
+    ; word_length := 64
     ; code_alignment := 2
     ; valid_imm := valid_immediate
     ; addr_offset := (^off_min, ^off_max)
