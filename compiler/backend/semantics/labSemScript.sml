@@ -17,6 +17,7 @@ val _ = Datatype `
      ; mem_domain : 'a word set
      ; pc         : num
      ; be         : bool
+     ; wordlen    : num
      ; ffi        : 'ffi ffi_state  (* oracle *)
                   (* oracle: sequence of havoc on registers at each FFI call *)
      ; io_regs    : num (* seq number *) -> string (* ffi name *) -> num (* register *) -> 'a word option

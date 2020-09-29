@@ -165,9 +165,9 @@ val apply_if_opt_def = Define `
          | NONE => NONE
          | SOME (_,w2) =>
             if w1 = w2 then NONE
-            else if w1 = w then
+            else if w1 = sw2sw w then
               SOME (SmartSeq x0 (If x1 x2 x3 (Seq q1 p1) (Seq q2 p2)))
-            else if w2 = w then
+            else if w2 = sw2sw w then
               SOME (SmartSeq x0 (If x1 x2 x3 (Seq q1 p2) (Seq q2 p1)))
             else NONE`
 
@@ -308,7 +308,7 @@ val const_fp_inst_cs_def = Define `
 
 val get_var_imm_cs_def = Define `
   (get_var_imm_cs (Reg r) cs = lookup r cs) /\
-  (get_var_imm_cs (Imm i) _ = SOME i)`;
+  (get_var_imm_cs (Imm i) _ = SOME (sw2sw i))`;
 
 val is_gc_const_def = Define `is_gc_const c = ((c && 1w) = 0w)`
 

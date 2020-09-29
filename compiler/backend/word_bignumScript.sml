@@ -132,7 +132,8 @@ val cmps = [(word_lo_def,``asm$Lower``),
 
 fun dest_reg_imm ri =
   mk_Reg (dest_reg ri) handle HOL_ERR _ =>
-  if can wordsSyntax.dest_n2w ri then mk_Imm ri else fail()
+  if can wordsSyntax.dest_n2w ri then
+  let val (num,_) = wordsSyntax.dest_n2w ri in mk_Imm “n2w ^num:word64” end else fail()
 
 fun get_guard b = (* Op *) let
   val (_,name) = first (fn (pat,_) => can (match_term pat) b) cmps
@@ -347,8 +348,8 @@ fun get_full_prog inp tm = let
              |> LIST_CONJ |> CONJ (REFL init_prog) |> concl
   fun is_delete tm =
     can (match_term ``(Delete n):'a mini``) tm
-  val Add_tm = ``(Add n1 n2):num -> α reg_imm -> α reg_imm -> α mini``
-  val Sub_tm = ``(Sub n1 n2):num -> α reg_imm -> α reg_imm -> α mini``
+  val Add_tm = ``(Add n1 n2):num -> reg_imm -> reg_imm -> α mini``
+  val Sub_tm = ``(Sub n1 n2):num -> reg_imm -> reg_imm -> α mini``
   val Mul_tm = ``(Mul n1 n2):num -> num -> α mini``
   val Div_tm = ``(Div n1 n2):num -> num -> num -> α mini``
   fun is_assign tm =
@@ -447,12 +448,12 @@ val SeqTemp_def = Define `
 
 val SeqTempImm_def = Define `
   SeqTempImm i (Reg r) p = SeqTemp i r p /\
-  SeqTempImm i (Imm w) p = Seq (wordLang$Assign i (Const w)) p`;
+  SeqTempImm i (Imm w) p = Seq (wordLang$Assign i (Const (w2w w))) p`;
 
 val SeqTempImmNot_def = Define `
   SeqTempImmNot i (Reg r) p =
     SeqTemp i r (Seq (Assign i (Op Xor [Var i; Const (~0w)])) p) /\
-  SeqTempImmNot i (Imm w) p = Seq (wordLang$Assign i (Const (~w))) p`;
+  SeqTempImmNot i (Imm w) p = Seq (wordLang$Assign i (Const (~w2w w))) p`;
 
 val SeqIndex_def = Define `
   SeqIndex i r arr p =

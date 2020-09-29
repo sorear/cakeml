@@ -144,6 +144,7 @@ Theorem update_simps[simp]:
     ((labSem$upd_pc x s).mem_domain = s.mem_domain) ∧
     ((labSem$upd_pc x s).failed = s.failed) ∧
     ((labSem$upd_pc x s).be = s.be) ∧
+    ((labSem$upd_pc x s).wordlen = s.wordlen) ∧
     ((labSem$upd_pc x s).mem = s.mem) ∧
     ((labSem$upd_pc x s).regs = s.regs) ∧
     ((labSem$upd_pc x s).fp_regs = s.fp_regs) ∧
@@ -155,6 +156,7 @@ Theorem update_simps[simp]:
     ((labSem$inc_pc s).link_reg = s.link_reg) ∧
     ((labSem$inc_pc s).code = s.code) ∧
     ((labSem$inc_pc s).be = s.be) ∧
+    ((labSem$inc_pc s).wordlen = s.wordlen) ∧
     ((labSem$inc_pc s).failed = s.failed) ∧
     ((labSem$inc_pc s).mem_domain = s.mem_domain) ∧
     ((labSem$inc_pc s).io_regs = s.io_regs) ∧
@@ -180,6 +182,7 @@ Theorem binop_upd_consts[simp]:
    (labSem$binop_upd a b c d x).link_reg = x.link_reg ∧
    (labSem$binop_upd a b c d x).code = x.code ∧
    (labSem$binop_upd a b c d x).be = x.be ∧
+   (labSem$binop_upd a b c d x).wordlen = x.wordlen ∧
    (labSem$binop_upd a b c d x).mem = x.mem ∧
    (labSem$binop_upd a b c d x).io_regs = x.io_regs ∧
    (labSem$binop_upd a b c d x).cc_regs = x.cc_regs ∧
@@ -201,6 +204,7 @@ Theorem arith_upd_consts[simp]:
    (labSem$arith_upd a x).link_reg = x.link_reg ∧
    (labSem$arith_upd a x).code = x.code ∧
    (labSem$arith_upd a x).be = x.be ∧
+   (labSem$arith_upd a x).wordlen = x.wordlen ∧
    (labSem$arith_upd a x).mem = x.mem ∧
    (labSem$arith_upd a x).io_regs = x.io_regs ∧
    (labSem$arith_upd a x).cc_regs = x.cc_regs ∧
@@ -227,6 +231,7 @@ Theorem fp_upd_consts[simp]:
    (labSem$fp_upd f x).compile = x.compile ∧
    (labSem$fp_upd f x).compile_oracle = x.compile_oracle ∧
    (labSem$fp_upd f x).be = x.be ∧
+   (labSem$fp_upd f x).wordlen = x.wordlen ∧
    (labSem$fp_upd f x).mem = x.mem ∧
    (labSem$fp_upd f x).io_regs = x.io_regs ∧
    (labSem$fp_upd f x).pc = x.pc ∧
@@ -340,7 +345,7 @@ QED
 
 fun get_thms ty = { case_def = TypeBase.case_def_of ty, nchotomy = TypeBase.nchotomy_of ty }
 val case_eq_thms = pair_case_eq::bool_case_eq::map (prove_case_eq_thm o get_thms)
-  [``:'a line``,``:'a option``,``:'a asm_with_lab``,``:'a asm_or_cbw``,``:'a asm``,
+  [``:'a line``,``:'a option``,``:asm_with_lab``,``:asm_or_cbw``,``:asm``,
    ``:'a word_loc``,``:'a list``,``:'a sec``,``:'a ffi_result``] |> LIST_CONJ |> curry save_thm "case_eq_thms"
 
 Theorem evaluate_io_events_mono:
@@ -436,6 +441,7 @@ Theorem align_dm_const[simp]:
    (align_dm s).code = s.code ∧
    (align_dm s).mem = s.mem ∧
    (align_dm s).be = s.be ∧
+   (align_dm s).wordlen = s.wordlen ∧
    (align_dm s).len_reg = s.len_reg ∧
    (align_dm s).link_reg = s.link_reg ∧
    (align_dm s).ptr_reg = s.ptr_reg ∧
@@ -521,7 +527,7 @@ QED
 
 Theorem mem_load_align_dm:
    good_dimindex (:α) ⇒
-   mem_load n (a:α addr) (align_dm s) = align_dm (mem_load n a s)
+   mem_load n (a:addr) (align_dm (s:('a,'c,'ffi) labSem$state)) = align_dm (mem_load n a s)
 Proof
   strip_tac
   \\ simp[mem_load_def]
@@ -568,7 +574,7 @@ QED
 
 Theorem mem_load_byte_align_dm:
    good_dimindex (:α) ⇒
-   mem_load_byte n (a:α addr) (align_dm s) = align_dm (mem_load_byte n a s)
+   mem_load_byte n a (align_dm (s:('a,'c,'ffi) labSem$state)) = align_dm (mem_load_byte n a s)
 Proof
   strip_tac
   \\ simp[mem_load_byte_def]
@@ -582,7 +588,7 @@ QED
 
 Theorem mem_store_align_dm:
    good_dimindex (:α) ⇒
-   mem_store n (a:α addr) (align_dm s) = align_dm (mem_store n a s)
+   mem_store n a (align_dm (s:('a,'c,'ffi) labSem$state)) = align_dm (mem_store n a s)
 Proof
   strip_tac
   \\ simp[mem_store_def]
@@ -629,7 +635,7 @@ QED
 
 Theorem mem_store_byte_align_dm:
    good_dimindex (:α) ⇒
-   mem_store_byte n (a:α addr) (align_dm s) = align_dm (mem_store_byte n a s)
+   mem_store_byte n a (align_dm (s:('a,'c,'ffi) labSem$state)) = align_dm (mem_store_byte n a s)
 Proof
   strip_tac
   \\ simp[mem_store_byte_def]
@@ -643,7 +649,7 @@ QED
 
 Theorem mem_op_align_dm:
    good_dimindex (:α) ⇒
-   mem_op m n (a:α addr) (align_dm s) = align_dm (mem_op m n a s)
+   mem_op m n a (align_dm (s:('a,'c,'ffi) labSem$state)) = align_dm (mem_op m n a s)
 Proof
   Cases_on`m`
   \\ simp[mem_op_def,
@@ -653,7 +659,7 @@ QED
 
 Theorem asm_inst_align_dm:
    good_dimindex (:α) ⇒
-   asm_inst (i:α inst) (align_dm s) = align_dm (asm_inst i s)
+   asm_inst i (align_dm (s:('a,'c,'ffi) labSem$state)) = align_dm (asm_inst i s)
 Proof
   Cases_on`i` \\ simp[asm_inst_def,mem_op_align_dm]
 QED
@@ -770,7 +776,7 @@ QED
 
 (* asm_ok checks coming into lab_to_target *)
 val line_ok_pre_def = Define`
-  (line_ok_pre (c:'a asm_config) (Asm b bytes l) ⇔ asm_ok (cbw_to_asm b) c) ∧
+  (line_ok_pre c (Asm b bytes l) ⇔ asm_ok (cbw_to_asm b) c) ∧
   (line_ok_pre c _ ⇔ T)`
 
 val sec_ok_pre_def = Define`

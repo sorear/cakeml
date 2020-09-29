@@ -234,10 +234,10 @@ val arm7_enc_def = Define`
 (* --- Configuration for ARMv7 --- *)
 
 val eval = rhs o concl o EVAL
-val min12 = eval ``-(w2w (UINT_MAXw: word12)) : word32``
-val max12 = eval ``w2w (UINT_MAXw: word12) : word32``
-val min26 = eval ``sw2sw (INT_MINw: 26 word) : word32``
-val max26 = eval ``sw2sw (INT_MAXw: 26 word) : word32``
+val min12 = eval ``-(w2w (UINT_MAXw: word12)) : word64``
+val max12 = eval ``w2w (UINT_MAXw: word12) : word64``
+val min26 = eval ``sw2sw (INT_MINw: 26 word) : word64``
+val max26 = eval ``sw2sw (INT_MAXw: 26 word) : word64``
 
 val valid_immediate_def = Define`
    valid_immediate = IS_SOME o EncodeARMImmediate`

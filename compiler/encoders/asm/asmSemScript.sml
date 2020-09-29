@@ -201,15 +201,15 @@ val jump_to_offset_def = Define `jump_to_offset w s = upd_pc (s.pc + w) s`
 
 val asm_def = Define `
   (asm (Inst i) pc s = upd_pc pc (inst i s)) /\
-  (asm (Jump l) pc s = jump_to_offset l s) /\
+  (asm (Jump l) pc s = jump_to_offset (w2w l) s) /\
   (asm (JumpCmp cmp r ri l) pc s =
      if word_cmp cmp (read_reg r s) (reg_imm ri s)
-     then jump_to_offset l s
+     then jump_to_offset (w2w l) s
      else upd_pc pc s) /\
-  (asm (Call l) pc s = jump_to_offset l (upd_reg s.lr pc s)) /\
+  (asm (Call l) pc s = jump_to_offset (w2w l) (upd_reg s.lr pc s)) /\
   (asm (JumpReg r) pc s =
      let a = read_reg r s in upd_pc a (assert (aligned s.align a) s)) /\
-  (asm (Loc r l) pc s = upd_pc pc (upd_reg r (s.pc + l) s))`
+  (asm (Loc r l) pc s = upd_pc pc (upd_reg r (s.pc + w2w l) s))`
 
 val asm_step_def = Define `
   asm_step c s1 i s2 <=>

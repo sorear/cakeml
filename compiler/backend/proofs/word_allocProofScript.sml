@@ -703,7 +703,7 @@ Proof
     full_simp_tac(srw_ss())[get_live_def,get_live_inst_def,inst_def,assign_def
       ,word_exp_perm]
     >-
-      (Cases_on`word_exp st (Const c)`>>
+      (Cases_on`word_exp st (Const (w2w c))`>>
       fs[word_exp_def,set_var_def,domain_union,get_writes_def,get_writes_inst_def]>>
       match_mp_tac strong_locals_rel_insert>>
       metis_tac[INSERT_SING_UNION])
@@ -798,7 +798,7 @@ Proof
       srw_tac[][]>>
       Cases_on`get_var n st`>>full_simp_tac(srw_ss())[]>>
       imp_res_tac strong_locals_rel_get_var>>
-      Cases_on`mem_store c x' st`>>fs[mem_store_def]>>IF_CASES_TAC>>fs[]>>
+      Cases_on`mem_store (w2w c) x' st`>>fs[mem_store_def]>>IF_CASES_TAC>>fs[]>>
       metis_tac[strong_locals_rel_subset,SUBSET_OF_INSERT])
     >-
       (qpat_abbrev_tac`expr=Op Add [Var n';A]`>>

@@ -193,7 +193,7 @@ val ssa_cc_trans_inst_def = Define`
   (ssa_cc_trans_inst (FP (FPMovToReg r1 r2 d)) ssa na =
     if r1 = r2 then
       let (r1',ssa',na') = next_var_rename r1 ssa na in
-        (Inst (FP (FPMovToReg r1' r2 d)),ssa',na')
+        (Inst (FP (FPMovToReg r1' r1' d)),ssa',na')
     else
       let (r1',ssa',na') = next_var_rename r1 ssa na in
       let (r2',ssa'',na'') = next_var_rename r2 ssa' na' in

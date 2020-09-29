@@ -44,11 +44,11 @@ val eval_exp_pre_def = Define `
 
 val eval_ri_pre_def = Define `
 (eval_ri_pre s (Reg r) <=> eval_exp_pre (s:'a state) ((Var r):'a wordLang$exp)) /\
-  (eval_ri_pre s (Imm (w:'a word)) <=> T)`;
+  (eval_ri_pre s (Imm w) <=> T)`;
 
 val eval_ri_def = Define `
   eval_ri s (Reg r) = eval_exp s (Var r) /\
-  eval_ri s (Imm w) = w`
+  eval_ri s (Imm w) = w2w w`
 
 val dec_clock_def = Define `
   dec_clock s = s with clock := s.clock - 1`;
@@ -423,7 +423,7 @@ val evaluate_SeqTemp = prove(
 val evaluate_SeqTempImm = prove(
   ``evaluate (SeqTempImm i ri p,t) =
     if !r. ri = Reg r ==> Temp (n2w r) IN FDOM t.store then
-       evaluate (p,set_var i (case ri of Imm w => Word w
+       evaluate (p,set_var i (case ri of Imm w => Word (w2w w)
                               | Reg r => t.store ' (Temp (n2w r))) t)
     else evaluate (SeqTempImm i ri p,t)``,
   Cases_on `ri` \\ fs [SeqTempImm_def]
@@ -435,7 +435,7 @@ val evaluate_SeqTempImmNot = prove(
   ``evaluate (SeqTempImmNot i ri p,t) =
     if !r. ri = Reg r ==> Temp (n2w r) IN FDOM t.store /\
                           ?w. t.store ' (Temp (n2w r)) = Word w then
-       evaluate (p,set_var i (case ri of Imm w => Word (~w)
+       evaluate (p,set_var i (case ri of Imm w => Word (~w2w w)
                               | Reg r => case t.store ' (Temp (n2w r)) of
                                          | Word w => Word (~w)) t)
     else evaluate (SeqTempImmNot i ri p,t)``,
@@ -1761,7 +1761,7 @@ val Skip_tm = ``Skip:'a word_bignum$mini``
 val Swap_tm = ``Swap:'a word_bignum$mini``
 val Continue_tm = ``Continue:'a word_bignum$mini``
 
-val If_pat = ``word_bignum$If c r (ri:'a reg_imm) p1 p2``
+val If_pat = ``word_bignum$If c r ri (p1:'a word_bignum$mini) p2``
 fun dest_If tm = let
   val i = fst (match_term If_pat tm)
   fun list_dest f tm = let
@@ -1777,6 +1777,12 @@ fun mk_If (c,r,ri,p1,p2) = ``word_bignum$If ^c ^r ^ri ^p1 ^p2``;
 fun is_If tm = can dest_If tm
 
 val _ = diminish_srw_ss ["LET"];
+
+Theorem w2w_small:
+  (w2w (1w: word64) = 1w ∧ w2w (2w: word64) = 2w ∧ w2w (4w: word64) = 4w)
+Proof
+  fs [w2w_def]
+QED
 
 fun derive_corr_thm const_def = let
 
@@ -1836,7 +1842,7 @@ fun derive_corr_thm const_def = let
       val p1 = get_corr (tm |> rator |> rand)
       val p2 = get_corr (tm |> rand)
       val th = REWRITE_RULE [eval_exp_def,eval_exp_pre_def,asmTheory.word_cmp_def,
-                 eval_ri_pre_def,eval_ri_def] (INST i Corr_If)
+                 eval_ri_pre_def,eval_ri_def,w2w_small] (INST i Corr_If)
                |> CONV_RULE (DEPTH_CONV read_conv) |> REWRITE_RULE []
       in MATCH_MP th (CONJ p1 p2) end
     else if is_Seq tm then let

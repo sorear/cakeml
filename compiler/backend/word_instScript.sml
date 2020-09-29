@@ -189,9 +189,10 @@ val test = EVAL ``flatten_exp (pull_exp (Op Sub [Const 1w; Op Sub[Const 2w;Const
 *)
 
 val inst_select_exp_def = tDefine "inst_select_exp" `
-  (inst_select_exp (c:asm_config) (tar:num) (temp:num) (Load exp) =
+  (inst_select_exp (c:asm_config) (tar:num) (temp:num) ((Load exp):'a wordLang$exp):'a wordLang$prog =
     dtcase exp of
     | Op Add [exp';Const w] =>
+      let w = sw2sw w in
       if addr_offset_ok c w then
         let prog = inst_select_exp c temp temp exp' in
           Seq prog (Inst (Mem Load tar (Addr temp w)))
@@ -201,7 +202,7 @@ val inst_select_exp_def = tDefine "inst_select_exp" `
     | _ =>
       let prog = inst_select_exp c temp temp exp in
       Seq prog (Inst (Mem Load tar (Addr temp (0w))))) ∧
-  (inst_select_exp c (tar:num) (temp:num) (Const w) = (Inst (Const tar w))) ∧
+  (inst_select_exp c (tar:num) (temp:num) (Const w) = (Inst (Const tar (sw2sw w)))) ∧
   (inst_select_exp c (tar:num) (temp:num) (Var v) =
     Move 0 [tar,v]) ∧
   (inst_select_exp c tar temp (Lookup store_name) =
@@ -212,6 +213,7 @@ val inst_select_exp_def = tDefine "inst_select_exp" `
     dtcase e2 of
     | Const w =>
       (*t = r op const*)
+      let w = sw2sw w in
       if c.valid_imm (INL op) w then
         Seq p1 (Inst (Arith (Binop op tar temp (Imm w))))
       (*t = r + const --> t = r - const*)
@@ -242,20 +244,21 @@ val inst_select_exp_def = tDefine "inst_select_exp" `
    \\ TRY (DECIDE_TAC)) ;
 
 Theorem inst_select_exp_pmatch:
-  !c tar temp exp.
+  !c tar temp (exp:'a wordLang$exp).
   inst_select_exp (c:asm_config) tar temp exp =
   case exp of
     Load(Op Add [exp';Const w]) =>
-      if addr_offset_ok c w then
+      let w64 = sw2sw w in
+      if addr_offset_ok c w64 then
         let prog = inst_select_exp c temp temp exp' in
-          Seq prog (Inst (Mem Load tar (Addr temp w)))
+          Seq prog (Inst (Mem Load tar (Addr temp w64)))
       else
         (let prog = inst_select_exp c temp temp (Op Add [exp'; Const w]) in
           Seq prog (Inst (Mem Load tar (Addr temp (0w)))))
   | Load exp =>
       (let prog = inst_select_exp c temp temp exp in
       Seq prog (Inst (Mem Load tar (Addr temp (0w)))))
-  | Const w => Inst (Const tar w)
+  | Const w => Inst (Const tar (sw2sw w))
   | Var v =>
     Move 0 [tar,v]
   | Lookup store_name =>
@@ -264,6 +267,7 @@ Theorem inst_select_exp_pmatch:
   | Op op [e1;e2] =>
     (case e2 of
       Const w =>
+      let w = sw2sw w in
       (*t = r op const*)
       if c.valid_imm (INL op) w then
         Seq (inst_select_exp c temp temp e1) (Inst (Arith (Binop op tar temp (Imm w))))
@@ -318,6 +322,7 @@ val inst_select_def = Define`
     let exp = (flatten_exp o pull_exp) exp in
     dtcase exp of
     | Op Add [exp';Const w] =>
+      let w = sw2sw w in
       if addr_offset_ok c w then
         let prog = inst_select_exp c temp temp exp' in
           Seq prog (Inst (Mem Store var (Addr temp w)))
@@ -357,7 +362,7 @@ val inst_select_def = Define`
 
 Theorem inst_select_pmatch:
   !c temp prog.
-  inst_select c temp prog =
+  inst_select c temp (prog:'a wordLang$prog) =
   case prog of
   | Assign v exp =>
     (inst_select_exp c v temp o flatten_exp o pull_exp) exp
@@ -368,6 +373,7 @@ Theorem inst_select_pmatch:
     (let exp = (flatten_exp o pull_exp) exp in
     case exp of
     | Op Add [exp';Const w] =>
+      let w = sw2sw w in
       if addr_offset_ok c w then
         let prog = inst_select_exp c temp temp exp' in
           Seq prog (Inst (Mem Store var (Addr temp w)))
