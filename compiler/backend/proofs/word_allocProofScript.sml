@@ -4445,7 +4445,7 @@ Proof
     Cases_on`i`>> (TRY (Cases_on`a`))>> (TRY(Cases_on`m`))>>
     full_simp_tac(srw_ss())[next_var_rename_def,ssa_cc_trans_inst_def,inst_def,assign_def,word_exp_perm,evaluate_def,LET_THM]
     >-
-      (Cases_on`word_exp st (Const c)`>>
+      (Cases_on`word_exp st (Const (w2w c))`>>
       full_simp_tac(srw_ss())[set_var_def,word_exp_def]>>
       match_mp_tac ssa_locals_rel_set_var>>
       full_simp_tac(srw_ss())[every_var_inst_def,every_var_def])
@@ -4652,7 +4652,7 @@ Proof
       Cases_on`x`>>fs[]>>
       Cases_on`get_var n st`>>full_simp_tac(srw_ss())[]>>imp_res_tac ssa_locals_rel_get_var>>
       full_simp_tac(srw_ss())[option_lookup_def]>>
-      Cases_on`mem_store c x' st`>>
+      Cases_on`mem_store c' x st`>>
       full_simp_tac(srw_ss())[mem_store_def]>>
       IF_CASES_TAC>>fs[])
     >-
@@ -4667,7 +4667,6 @@ Proof
       (Cases_on`f`>>
       fs[next_var_rename_def,ssa_cc_trans_inst_def,inst_def,assign_def,word_exp_perm,evaluate_def,get_fp_var_def,set_var_def,every_var_def,every_var_inst_def,set_fp_var_def,get_var_perm]>>
       TRY(rename1 `FPMovFromReg n n0 n1`>>
-      reverse (IF_CASES_TAC)>>fs[]>-
       (* Nasty special case for 32-bit FPMovFromReg because it can't use the default option_lookup *)
         (Cases_on`get_var n0 st`>>fs[]>>
         Cases_on`x`>>fs[]>>

@@ -591,19 +591,14 @@ val inst_def = Define `
       (case get_fp_var d s of
       | SOME v =>
         if dimindex(:'a) = 64 then
-          SOME (set_var r1 (Word (w2w v)) s)
+          SOME (set_var r2 (Word 0w) (set_var r1 (Word (w2w v)) s))
         else
           SOME (set_var r2 (Word ((63 >< 32) v)) (set_var r1 (Word ((31 >< 0) v)) s))
       | _ => NONE)
     | FP (FPMovFromReg d r1 r2) =>
-      (if dimindex(:'a) = 64 then
-        case get_var r1 s of
-          SOME (Word w1) => SOME (set_fp_var d (w2w w1) s)
-        | _ => NONE
-      else
-        case (get_var r1 s,get_var r2 s) of
-          (SOME (Word w1),SOME (Word w2)) => SOME (set_fp_var d (w2 @@ w1) s)
-        | _ => NONE)
+      (case (get_var r1 s,get_var r2 s) of
+         (SOME (Word w1),SOME (Word w2)) => SOME (set_fp_var d (w2 @@ w1) s)
+       | _ => NONE)
     | FP (FPToInt d1 d2) =>
       (case get_fp_var d2 s of
         NONE => NONE

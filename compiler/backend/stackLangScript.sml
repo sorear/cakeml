@@ -68,13 +68,15 @@ val _ = map overload_on
    ("xor_inst",``\r1 r2. Inst (Arith (Binop Xor r1 r1 (Reg r2)))``),
    ("add_1_inst",``\r1. Inst (Arith (Binop Add r1 r1 (Imm 1w)))``),
    ("or_inst",``\r1 r2. Inst (Arith (Binop Or r1 r1 (Reg r2)))``),
-   ("add_bytes_in_word_inst",``\r1. Inst (Arith (Binop Add r1 r1 (Imm (bytes_in_word))))``),
    ("div2_inst",``\r. Inst (Arith (Shift Lsr r r 1))``),
    ("left_shift_inst",``\r v. Inst (Arith (Shift Lsl r r v))``),
    ("right_shift_inst",``\r v. Inst (Arith (Shift Lsr r r v))``),
    ("const_inst",``\r w. Inst (Const r w)``),
    ("load_inst",``\r a. Inst (Mem Load r (Addr a 0w))``),
    ("store_inst",``\r a. Inst (Mem Store r (Addr a 0w))``)]
+
+val add_bytes_in_word_inst_def = Define`
+  add_bytes_in_word_inst (:'a) r1 = Inst (Arith (Binop Add r1 r1 (Imm (n2w (dimindex (:'a) DIV 8)))))`
 
 val list_Seq_def = Define `
   (list_Seq [] = Skip) /\

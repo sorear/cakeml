@@ -2875,9 +2875,9 @@ val inst_ok_less_def = Define`
     fp_reg_ok d1 c /\ fp_reg_ok d2 c /\ fp_reg_ok d3 c) /\
   (inst_ok_less c (FP (FPMov d1 d2)) ⇔ fp_reg_ok d1 c  ∧ fp_reg_ok d2 c) ∧
   (inst_ok_less c (FP (FPMovToReg r1 r2 d)) ⇔
-      ((c.word_length = 32) ==> r1 <> r2) ∧ fp_reg_ok d c) ∧
+      r1 <> r2 ∧ fp_reg_ok d c) ∧
   (inst_ok_less c (FP (FPMovFromReg d r1 r2)) ⇔
-      ((c.word_length = 32) ==> r1 <> r2) ∧ fp_reg_ok d c) ∧
+      r1 <> r2 ∧ fp_reg_ok d c) ∧
   (inst_ok_less c (FP (FPToInt d1 d2)) ⇔ fp_reg_ok d1 c  ∧ fp_reg_ok d2 c) ∧
   (inst_ok_less c (FP (FPFromInt d1 d2)) ⇔ fp_reg_ok d1 c  ∧ fp_reg_ok d2 c) ∧
   (inst_ok_less _ _ = T)`

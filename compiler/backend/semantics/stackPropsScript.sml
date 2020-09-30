@@ -729,11 +729,9 @@ val fp_name_def = Define `
       fp_reg_ok d1 c /\ fp_reg_ok d2 c /\ fp_reg_ok d3 c) /\
   (fp_name (FPMov d1 d2) c <=> fp_reg_ok d1 c /\ fp_reg_ok d2 c) /\
   (fp_name (FPMovToReg r1 r2 d) (c : asm_config) <=>
-      reg_name r1 c /\ reg_name r2 c /\
-      fp_reg_ok d c) /\
+      reg_name r1 c /\ reg_name r2 c /\ r1 <> r2 /\ fp_reg_ok d c) /\
   (fp_name (FPMovFromReg d r1 r2) (c : asm_config) <=>
-      reg_name r1 c /\ reg_name r2 c /\
-      fp_reg_ok d c) /\
+      reg_name r1 c /\ reg_name r2 c /\ r1 <> r2 /\ fp_reg_ok d c) /\
   (fp_name (FPToInt d1 d2) c <=> fp_reg_ok d1 c /\ fp_reg_ok d2 c) /\
   (fp_name (FPFromInt d1 d2) c <=> fp_reg_ok d1 c /\ fp_reg_ok d2 c)`
 

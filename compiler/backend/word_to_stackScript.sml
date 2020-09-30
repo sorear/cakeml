@@ -144,15 +144,10 @@ val wInst_def = Define `
   (wInst (FP (FPEqual r f1 f2)) kf =
     wRegWrite1 (\r. Inst (FP (FPEqual r f1 f2))) r kf) /\
   (wInst (FP (FPMovToReg r1 r2 d)) kf =
-    if r1 = r2 then
-      wRegWrite1 (λr1. Inst (FP (FPMovToReg r1 0 d))) r1 kf
-    else
-      wRegWrite2 (λr2. wRegWrite1 (λr1. Inst(FP (FPMovToReg r1 r2 d))) r1 kf) r2 kf) /\
+    wRegWrite2 (λr2. wRegWrite1 (λr1. Inst(FP (FPMovToReg r1 r2 d))) r1 kf) r2 kf) /\
   (wInst (FP (FPMovFromReg d r1 r2)) kf =
     let (l,n1) = wReg1 r1 kf in
-    let (l',n2) =
-      if dimindex(:'a) = 64 then ([],0)
-      else wReg2 r2 kf in
+    let (l',n2) = wReg2 r2 kf in
     wStackLoad (l++l')
       (Inst (FP (FPMovFromReg d n1 n2)))) /\
   (wInst (FP f) kf = Inst (FP f)) /\ (*pass through the ones that don't use int registers *)
@@ -186,7 +181,7 @@ val wLive_def = Define `
     if f = 0 then (Skip,bitmaps)
     else
       let (new_bitmaps,i) = insert_bitmap (write_bitmap live k f') bitmaps in
-        (Seq (Inst (Const k (n2w (i+1)))) (StackStore k 0):'a stackLang$prog,new_bitmaps)`
+        (Seq (Inst (Const k (n2w (i+1)))) (StackStore k 0):stackLang$prog,new_bitmaps)`
 
 val SeqStackFree_def = Define `
   SeqStackFree n p = if n = 0 then p else Seq (StackFree n) p`
@@ -245,7 +240,7 @@ val PopHandler_def = Define`
   prog))`
 
 val comp_def = Define `
-  (comp (Skip:'a wordLang$prog) bs kf = (Skip:'a stackLang$prog,bs)) /\
+  (comp (Skip:'a wordLang$prog) bs kf = (Skip:stackLang$prog,bs)) /\
   (comp (Move _ xs) bs kf = (wMove xs kf,bs)) /\
   (comp (Inst i) bs kf = (wInst i kf,bs)) /\
   (comp (Return v1 v2) bs kf =

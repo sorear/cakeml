@@ -302,11 +302,11 @@ val WriteLastByte_aux_def = Define`
 
 val WriteLastBytes_def = Define`
   WriteLastBytes a b n =
-    WriteLastByte_aux (0w:'a word) a b n (
+    WriteLastByte_aux 0w a b n (
       WriteLastByte_aux 1w a b n (
         WriteLastByte_aux 2w a b n (
           WriteLastByte_aux 3w a b n (
-            if dimindex(:'a) = 32 then Skip else
+            if dimindex(:'a) = 32 then (Skip:'a wordLang$prog) else
             WriteLastByte_aux 4w a b n (
               WriteLastByte_aux 5w a b n (
                 WriteLastByte_aux 6w a b n (
@@ -454,7 +454,7 @@ val AddNumSize_def = Define `
 
 val AnyHeader_def = Define `
   AnyHeader c r a t1 (* header *) t2 (* pointer *) t3 (* payload *) =
-    If Equal r (Imm (0w:'a word))
+    If Equal r (Imm 0w)
       (list_Seq [Assign 7 (Const 0w);
                  Set (Temp t1) (Var r);
                  Set (Temp t2) (Var r);
@@ -477,7 +477,7 @@ val AnyHeader_def = Define `
         [Set (Temp t1) (Const 3w);
          Set (Temp t2) (Lookup (if a then OtherHeap else NextFree));
          Set (Temp t3) (Op Sub [Const 0w; Shift Asr (Var r) 2]);
-         Assign 7 (Const 0w)])))`
+         Assign 7 (Const 0w)]))) :'a wordLang$prog`
 
 val ShiftVar_def = Define `
   ShiftVar sh v n =
@@ -640,7 +640,7 @@ val Compare_code_def = Define `
                    (Seq (Assign 2 (Const 2w)) (Return 0 2))])
    (If Test 4 (Imm 1w) (* 2nd arg is small number: 1st must be bigum *)
       (list_Seq [Assign 1 (Load (real_addr c 2)); (* loads header of 1st arg *)
-                 If Test 1 (Imm (16w:'a word))
+                 If Test 1 (Imm 16w)
                    (Seq (Assign 2 (Const 2w)) (Return 0 2))
                    (Seq (Assign 2 (Const 0w)) (Return 0 2))])
       (list_Seq [Assign 11 (real_addr c 2);
@@ -667,7 +667,7 @@ val Compare_code_def = Define `
                          (Seq (Assign 2 (Const 0w)) (Return 0 2))
                          (If Lower 6 (Reg 8)
                             (Seq (Assign 2 (Const 2w)) (Return 0 2))
-                            (Seq (Assign 2 (Const 0w)) (Return 0 2)))))]))`;
+                            (Seq (Assign 2 (Const 0w)) (Return 0 2)))))])):'a wordLang$prog`;
 
 val Equal1_code_def = Define `
   Equal1_code =
@@ -1498,7 +1498,7 @@ val def = assign_Define `
         (list_Seq [
            Assign 1 (Op Or [Var (adjust_var v1); Var (adjust_var v2)]);
            Assign 1 (Op Or [Var 1; ShiftVar Lsr 1 (dimindex (:'a)-1)]);
-           If Test 1 (Imm (1w:'a word))
+           If Test 1 (Imm 1w)
              (if c.has_div then
                 list_Seq [Inst (Arith (Div 1 (adjust_var v1) (adjust_var v2)));
                           Assign (adjust_var dest) (ShiftVar Lsl 1 2)]
@@ -1527,7 +1527,7 @@ val def = assign_Define `
         (list_Seq [
            Assign 1 (Op Or [Var (adjust_var v1); Var (adjust_var v2)]);
            Assign 1 (Op Or [Var 1; ShiftVar Lsr 1 (dimindex (:'a)-1)]);
-           If Test 1 (Imm (1w:'a word))
+           If Test 1 (Imm 1w)
              (if c.has_div then
                 list_Seq [Inst (Arith (Div 1 (adjust_var v1) (adjust_var v2)));
                           Inst (Arith (LongMul 3 1 1 (adjust_var v2)));
@@ -2043,12 +2043,12 @@ val comp_def = Define `
         let w = n2w (n * k) in
         let w = if w2n w = n * k then w else ~0w in
           (Seq (Assign 1 (Op Sub [Lookup TriggerGC; Lookup NextFree]))
-               (If Lower 1 (Imm w)
+               (wordLang$If Lower 1 (Imm (w2w w))
                  (list_Seq [SilentFFI c 3 (adjust_set names);
-                            Assign 1 (Const w);
+                            wordLang$Assign 1 (wordLang$Const w);
                             Alloc 1 (adjust_set names);
                             SilentFFI c 3 (adjust_set names)])
-                Skip),l)
+                Skip):'a wordLang$prog,l)
     | Assign dest op args names => assign c secn l dest op args names
     | Call ret target args handler =>
         dtcase ret of
@@ -2278,7 +2278,7 @@ val compile_def = Define `
       (data_conf with <| has_fp_ops := (1 < asm_conf.fp_reg_count);
                       has_fp_tern := (asm_conf.ISA = ARMv7 /\ 2 < asm_conf.fp_reg_count) |>) in
     let p = stubs (:α) data_conf ++ MAP (compile_part data_conf) prog in
-      word_to_word$compile word_conf (asm_conf:'a asm_config) p`;
+      word_to_word$compile word_conf (asm_conf:asm_config) p`;
 
 (* compute bignum call graph *)
 

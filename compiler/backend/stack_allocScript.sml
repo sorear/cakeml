@@ -12,22 +12,22 @@ val _ = new_theory "stack_alloc";
 val _ = patternMatchesLib.ENABLE_PMATCH_CASES();
 
 val memcpy_code_def = Define `
-  memcpy_code =
+  memcpy_code (:'a) =
     While NotEqual 0 (Imm 0w)
       (list_Seq [load_inst 1 2;
-                 add_bytes_in_word_inst 2;
+                 add_bytes_in_word_inst (:'a) 2;
                  sub_1_inst 0;
                  store_inst 1 3;
-                 add_bytes_in_word_inst 3])`
+                 add_bytes_in_word_inst (:'a) 3])`
 
 val clear_top_inst_def = Define `
-  clear_top_inst i n =
+  clear_top_inst (:'a) i n =
     Seq (left_shift_inst i (dimindex(:'a) - n - 1))
-        (right_shift_inst i (dimindex(:'a) - n - 1)):'a stackLang$prog`;
+        (right_shift_inst i (dimindex(:'a) - n - 1)):stackLang$prog`;
 
 val word_gc_move_code_def = Define `
-  word_gc_move_code conf =
-    If Test 5 (Imm (1w:'a word)) Skip
+  word_gc_move_code (:'a) conf =
+    If Test 5 (Imm 1w) Skip
       (list_Seq
         [move 0 5;
          Get 1 CurrHeap;
@@ -38,7 +38,7 @@ val word_gc_move_code_def = Define `
          If Test 1 (Imm 3w)
            (list_Seq [right_shift_inst 1 2;
                       left_shift_inst 1 (shift_length conf);
-                      clear_top_inst 5 (small_shift_length conf - 1);
+                      clear_top_inst (:'a) 5 (small_shift_length conf - 1);
                       or_inst 5 1])
            (list_Seq [(* get len+1w *)
                       right_shift_inst 1 (dimindex (:'a) - conf.len_size);
@@ -48,7 +48,7 @@ val word_gc_move_code_def = Define `
                       (* memcpy *)
                       move 2 0;
                       move 0 1;
-                      memcpy_code;
+                      memcpy_code (:'a);
                       (* compute original header_addr *)
                       move 0 6;
                       left_shift_inst 0 (word_shift (:'a));
@@ -59,70 +59,70 @@ val word_gc_move_code_def = Define `
                       store_inst 0 2;
                       (* compute update_addr conf i w, where i in 4 and w in 5 *)
                       move 1 4;
-                      clear_top_inst 5 (small_shift_length conf - 1);
+                      clear_top_inst (:'a) 5 (small_shift_length conf - 1);
                       left_shift_inst 1 (shift_length conf);
                       or_inst 5 1;
                       (* add to i in 4 *)
                       add_inst 4 6])])`
 
 val word_gc_move_list_code_def = Define `
-  word_gc_move_list_code conf =
-    While NotEqual 7 (Imm (0w:'a word))
+  word_gc_move_list_code (:'a) conf =
+    While NotEqual 7 (Imm 0w)
       (list_Seq [load_inst 5 8;
                  sub_1_inst 7;
-                 word_gc_move_code conf;
+                 word_gc_move_code (:'a) conf;
                  store_inst 5 8;
-                 add_bytes_in_word_inst 8])`
+                 add_bytes_in_word_inst (:'a) 8])`
 
 val word_gc_move_loop_code_def = Define `
-  word_gc_move_loop_code conf =
+  word_gc_move_loop_code (:'a) conf =
     While NotEqual 3 (Reg 8)
      (list_Seq [load_inst 7 8;
                 If Test 7 (Imm 4w)
                   (list_Seq [right_shift_inst 7 (dimindex (:α) - conf.len_size);
-                             add_bytes_in_word_inst 8;
-                             word_gc_move_list_code conf])
+                             add_bytes_in_word_inst (:'a) 8;
+                             word_gc_move_list_code (:'a) conf])
                   (list_Seq [right_shift_inst 7 (dimindex (:α) - conf.len_size);
                              add_1_inst 7;
                              left_shift_inst 7 (word_shift (:'a));
-                             add_inst 8 7])]):'a stackLang$prog`
+                             add_inst 8 7])]):stackLang$prog`
 
 (* 7 is w, 8 is index into stack, 5 is input to word_gc_move_code *)
 val word_gc_move_bitmap_code_def = Define `
-  word_gc_move_bitmap_code conf =
+  word_gc_move_bitmap_code (:'a) conf =
     While NotLower 7 (Imm 2w)
      (If Test 7 (Imm 1w)
         (list_Seq [right_shift_inst 7 1;
-                   add_bytes_in_word_inst 8])
+                   add_bytes_in_word_inst (:'a) 8])
         (list_Seq [StackLoadAny 5 8;
                    right_shift_inst 7 1;
-                   word_gc_move_code conf;
+                   word_gc_move_code (:'a) conf;
                    StackStoreAny 5 8;
-                   add_bytes_in_word_inst 8]))`
+                   add_bytes_in_word_inst (:'a) 8]))`
 
 (* 9 is w, 8 is index into stack *)
 val word_gc_move_bitmaps_code_def = Define `
-  (word_gc_move_bitmaps_code conf):'a stackLang$prog =
+  word_gc_move_bitmaps_code (:'a) conf =
     While NotTest 0 (Reg 0)
       (list_Seq [BitmapLoad 7 9;
-                 word_gc_move_bitmap_code conf;
+                 word_gc_move_bitmap_code (:'a) conf;
                  BitmapLoad 0 9;
                  add_1_inst 9;
                  right_shift_inst 0 (dimindex (:'a) - 1)])`
 
 (* 9 is w, 8 is index into stack *)
 val word_gc_move_roots_bitmaps_code_def = Define `
-  (word_gc_move_roots_bitmaps_code conf):'a stackLang$prog =
+  word_gc_move_roots_bitmaps_code (:'a) conf =
     While NotTest 9 (Reg 9)
       (list_Seq [move 0 9;
                  sub_1_inst 9;
-                 add_bytes_in_word_inst 8;
-                 word_gc_move_bitmaps_code conf;
+                 add_bytes_in_word_inst (:'a) 8;
+                 word_gc_move_bitmaps_code (:'a) conf;
                  StackLoadAny 9 8])`
 
 val word_gen_gc_move_code_def = Define `
-  word_gen_gc_move_code conf =
-    If Test 5 (Imm (1w:'a word)) Skip
+  word_gen_gc_move_code (:'a) conf =
+    If Test 5 (Imm 1w) Skip
       (list_Seq
         [move 0 5;
          Get 1 CurrHeap;
@@ -133,7 +133,7 @@ val word_gen_gc_move_code_def = Define `
          If Test 1 (Imm 3w)
            (list_Seq [right_shift_inst 1 2;
                       left_shift_inst 1 (shift_length conf);
-                      clear_top_inst 5 (small_shift_length conf - 1);
+                      clear_top_inst (:'a) 5 (small_shift_length conf - 1);
                       or_inst 5 1])
            (list_Seq [(* put header in 6 *)
                       move 6 1;
@@ -159,14 +159,14 @@ val word_gen_gc_move_code_def = Define `
                           move 2 0;
                           move 4 0;
                           move 0 6;
-                          memcpy_code;
+                          memcpy_code (:'a);
                           (* compute original header_addr *)
                           Get 0 (Temp 3w); (* fixed? *)
                           left_shift_inst 0 2;
                           store_inst 0 4;
                           (* compute update_addr conf i w, where w in 5 *)
                           Get 1 (Temp 3w);
-                          clear_top_inst 5 (small_shift_length conf - 1);
+                          clear_top_inst (:'a) 5 (small_shift_length conf - 1);
                           left_shift_inst 1 (shift_length conf);
                           or_inst 5 1;
                           Get 3 (Temp 0w);
@@ -177,7 +177,7 @@ val word_gen_gc_move_code_def = Define `
                           (* memcpy *)
                           move 2 0;
                           move 0 1;
-                          memcpy_code;
+                          memcpy_code (:'a);
                           (* compute original header_addr *)
                           move 0 6;
                           left_shift_inst 0 (word_shift (:'a));
@@ -188,16 +188,16 @@ val word_gen_gc_move_code_def = Define `
                           store_inst 0 2;
                           (* compute update_addr conf i w, where i in 4 and w in 5 *)
                           move 1 4;
-                          clear_top_inst 5 (small_shift_length conf - 1);
+                          clear_top_inst (:'a) 5 (small_shift_length conf - 1);
                           left_shift_inst 1 (shift_length conf);
                           or_inst 5 1;
                           (* add to i in 4 *)
-                          add_inst 4 6])])]) :'a stackLang$prog`;
+                          add_inst 4 6])])])`;
 
 val word_gen_gc_partial_move_code_def = Define `
-  word_gen_gc_partial_move_code conf =
+  word_gen_gc_partial_move_code (:'a) conf =
     (* uses 0,1,2,6 as temps *)
-    If Test 5 (Imm (1w:'a word)) Skip
+    If Test 5 (Imm 1w) Skip
       (list_Seq
         [move 0 5;
          Get 6 (Temp 0w);
@@ -213,7 +213,7 @@ val word_gen_gc_partial_move_code_def = Define `
              If Test 1 (Imm 3w)
                (list_Seq [right_shift_inst 1 2;
                           left_shift_inst 1 (shift_length conf);
-                          clear_top_inst 5 (small_shift_length conf - 1);
+                          clear_top_inst (:'a) 5 (small_shift_length conf - 1);
                           or_inst 5 1])
                (list_Seq [(* put header in 6 *)
                           move 6 1;
@@ -225,7 +225,7 @@ val word_gen_gc_partial_move_code_def = Define `
                           (* memcpy *)
                           move 2 0;
                           move 0 1;
-                          memcpy_code;
+                          memcpy_code (:'a);
                           (* compute original header_addr *)
                           move 0 6;
                           left_shift_inst 0 (word_shift (:'a));
@@ -236,146 +236,146 @@ val word_gen_gc_partial_move_code_def = Define `
                           store_inst 0 2;
                           (* compute update_addr conf i w, where i in 4 and w in 5 *)
                           move 1 4;
-                          clear_top_inst 5 (small_shift_length conf - 1);
+                          clear_top_inst (:'a) 5 (small_shift_length conf - 1);
                           left_shift_inst 1 (shift_length conf);
                           or_inst 5 1;
                           (* add to i in 4 *)
-                          add_inst 4 6])])))]) :'a stackLang$prog`;
+                          add_inst 4 6])])))])`;
 
 val word_gen_gc_move_bitmap_code_def = Define `
-  word_gen_gc_move_bitmap_code conf =
+  word_gen_gc_move_bitmap_code (:'a) conf =
     While NotLower 7 (Imm 2w)
      (If Test 7 (Imm 1w)
         (list_Seq [right_shift_inst 7 1;
-                   add_bytes_in_word_inst 8])
+                   add_bytes_in_word_inst (:'a) 8])
         (list_Seq [StackLoadAny 5 8;
                    right_shift_inst 7 1;
-                   word_gen_gc_move_code conf;
+                   word_gen_gc_move_code (:'a) conf;
                    StackStoreAny 5 8;
-                   add_bytes_in_word_inst 8]))`
+                   add_bytes_in_word_inst (:'a) 8]))`
 
 val word_gen_gc_partial_move_bitmap_code_def = Define `
-  word_gen_gc_partial_move_bitmap_code conf =
+  word_gen_gc_partial_move_bitmap_code (:'a) conf =
     While NotLower 7 (Imm 2w)
      (If Test 7 (Imm 1w)
         (list_Seq [right_shift_inst 7 1;
-                   add_bytes_in_word_inst 8])
+                   add_bytes_in_word_inst (:'a) 8])
         (list_Seq [StackLoadAny 5 8;
                    right_shift_inst 7 1;
-                   word_gen_gc_partial_move_code conf;
+                   word_gen_gc_partial_move_code (:'a) conf;
                    StackStoreAny 5 8;
-                   add_bytes_in_word_inst 8]))`
+                   add_bytes_in_word_inst (:'a) 8]))`
 
 (* 9 is w, 8 is index into stack *)
 val word_gen_gc_move_bitmaps_code_def = Define `
-  (word_gen_gc_move_bitmaps_code conf):'a stackLang$prog =
+  word_gen_gc_move_bitmaps_code (:'a) conf =
     While NotTest 0 (Reg 0)
       (list_Seq [BitmapLoad 7 9;
-                 word_gen_gc_move_bitmap_code conf;
+                 word_gen_gc_move_bitmap_code (:'a) conf;
                  BitmapLoad 0 9;
                  add_1_inst 9;
                  right_shift_inst 0 (dimindex (:'a) - 1)])`
 
 (* 9 is w, 8 is index into stack *)
 val word_gen_gc_partial_move_bitmaps_code_def = Define `
-  (word_gen_gc_partial_move_bitmaps_code conf):'a stackLang$prog =
+  word_gen_gc_partial_move_bitmaps_code (:'a) conf =
     While NotTest 0 (Reg 0)
       (list_Seq [BitmapLoad 7 9;
-                 word_gen_gc_partial_move_bitmap_code conf;
+                 word_gen_gc_partial_move_bitmap_code (:'a) conf;
                  BitmapLoad 0 9;
                  add_1_inst 9;
                  right_shift_inst 0 (dimindex (:'a) - 1)])`
 
 (* 9 is w, 8 is index into stack *)
 val word_gen_gc_move_roots_bitmaps_code_def = Define `
-  (word_gen_gc_move_roots_bitmaps_code conf):'a stackLang$prog =
+  word_gen_gc_move_roots_bitmaps_code (:'a) conf =
     While NotTest 9 (Reg 9)
       (list_Seq [move 0 9;
                  sub_1_inst 9;
-                 add_bytes_in_word_inst 8;
-                 word_gen_gc_move_bitmaps_code conf;
+                 add_bytes_in_word_inst (:'a) 8;
+                 word_gen_gc_move_bitmaps_code (:'a) conf;
                  StackLoadAny 9 8])`
 
 (* 9 is w, 8 is index into stack *)
 val word_gen_gc_partial_move_roots_bitmaps_code_def = Define `
-  (word_gen_gc_partial_move_roots_bitmaps_code conf):'a stackLang$prog =
+  word_gen_gc_partial_move_roots_bitmaps_code (:'a) conf =
     While NotTest 9 (Reg 9)
       (list_Seq [move 0 9;
                  sub_1_inst 9;
-                 add_bytes_in_word_inst 8;
-                 word_gen_gc_partial_move_bitmaps_code conf;
+                 add_bytes_in_word_inst (:'a) 8;
+                 word_gen_gc_partial_move_bitmaps_code (:'a) conf;
                  StackLoadAny 9 8])`
 
 val word_gen_gc_move_list_code_def = Define `
-  word_gen_gc_move_list_code conf =
-    While NotEqual 7 (Imm (0w:'a word))
+  word_gen_gc_move_list_code (:'a) conf =
+    While NotEqual 7 (Imm 0w)
       (list_Seq [load_inst 5 8;
                  sub_1_inst 7;
-                 word_gen_gc_move_code conf;
+                 word_gen_gc_move_code (:'a) conf;
                  store_inst 5 8;
-                 add_bytes_in_word_inst 8])`
+                 add_bytes_in_word_inst (:'a) 8])`
 
 val word_gen_gc_partial_move_list_code_def = Define `
-  word_gen_gc_partial_move_list_code conf =
-    While NotEqual 7 (Imm (0w:'a word))
+  word_gen_gc_partial_move_list_code (:'a) conf =
+    While NotEqual 7 (Imm 0w)
       (list_Seq [load_inst 5 8;
                  sub_1_inst 7;
-                 word_gen_gc_partial_move_code conf;
+                 word_gen_gc_partial_move_code (:'a) conf;
                  store_inst 5 8;
-                 add_bytes_in_word_inst 8])`
+                 add_bytes_in_word_inst (:'a) 8])`
 
 val word_gen_gc_move_data_code_def = Define `
-  word_gen_gc_move_data_code conf =
+  word_gen_gc_move_data_code (:'a) conf =
     While NotEqual 3 (Reg 8)
      (list_Seq [load_inst 7 8;
                 If Test 7 (Imm 4w)
                   (list_Seq [right_shift_inst 7 (dimindex (:α) - conf.len_size);
-                             add_bytes_in_word_inst 8;
-                             word_gen_gc_move_list_code conf])
+                             add_bytes_in_word_inst (:'a) 8;
+                             word_gen_gc_move_list_code (:'a) conf])
                   (list_Seq [right_shift_inst 7 (dimindex (:α) - conf.len_size);
                              add_1_inst 7;
                              left_shift_inst 7 (word_shift (:'a));
-                             add_inst 8 7])]):'a stackLang$prog`
+                             add_inst 8 7])])`
 
 val word_gen_gc_partial_move_ref_list_code_def = Define `
-  word_gen_gc_partial_move_ref_list_code conf =
+  word_gen_gc_partial_move_ref_list_code (:'a) conf =
     While NotEqual 9 (Reg 8)
      (list_Seq [load_inst 7 8;
                 right_shift_inst 7 (dimindex (:α) - conf.len_size);
-                add_bytes_in_word_inst 8;
-                word_gen_gc_partial_move_list_code conf]):'a stackLang$prog`
+                add_bytes_in_word_inst (:'a) 8;
+                word_gen_gc_partial_move_list_code (:'a) conf])`
 
 val word_gen_gc_partial_move_data_code_def = Define `
-  word_gen_gc_partial_move_data_code conf =
+  word_gen_gc_partial_move_data_code (:'a) conf =
     While NotEqual 3 (Reg 8)
      (list_Seq [load_inst 7 8;
                 If Test 7 (Imm 4w)
                   (list_Seq [right_shift_inst 7 (dimindex (:α) - conf.len_size);
-                             add_bytes_in_word_inst 8;
-                             word_gen_gc_partial_move_list_code conf])
+                             add_bytes_in_word_inst (:'a) 8;
+                             word_gen_gc_partial_move_list_code (:'a) conf])
                   (list_Seq [right_shift_inst 7 (dimindex (:α) - conf.len_size);
                              add_1_inst 7;
                              left_shift_inst 7 (word_shift (:'a));
-                             add_inst 8 7])]):'a stackLang$prog`
+                             add_inst 8 7])])`
 
 val word_gen_gc_move_refs_code_def = Define `
-  word_gen_gc_move_refs_code conf =
+  word_gen_gc_move_refs_code (:'a) conf =
     (* r2a in 8, r1a in 0 and Temp 4w *)
     While NotEqual 0 (Reg 8)
      (list_Seq [load_inst 7 8;
                 right_shift_inst 7 (dimindex (:α) - conf.len_size);
-                add_bytes_in_word_inst 8;
-                word_gen_gc_move_list_code conf;
-                Get 0 (Temp 4w)]):'a stackLang$prog`
+                add_bytes_in_word_inst (:'a) 8;
+                word_gen_gc_move_list_code (:'a) conf;
+                Get 0 (Temp 4w)])`
 
 val word_gen_gc_move_loop_code_def = Define `
-  word_gen_gc_move_loop_code conf =
+  word_gen_gc_move_loop_code (:'a) conf =
     (* 7 is 0w iff pbx = pb and pax = pa, 1 is pbx (Temp 4w), 2 is pb,
        8 is pax, 3 is pa *)
     While NotTest 7 (Reg 7)
       (If Equal 1 (Reg 2)
          (* case: pax <> pa, i.e. move_data *)
-         (list_Seq [word_gen_gc_move_data_code conf;
+         (list_Seq [word_gen_gc_move_data_code (:'a) conf;
                     Get 5 (Temp 2w);
                     Get 7 (Temp 4w);
                     move 1 7;
@@ -386,7 +386,7 @@ val word_gen_gc_move_loop_code_def = Define `
                     Set (Temp 6w) 8;
                     move 8 2;
                     Set (Temp 5w) 8;
-                    word_gen_gc_move_refs_code conf;
+                    word_gen_gc_move_refs_code (:'a) conf;
                     move 7 8; (* pbx' *)
                     Get 1 (Temp 5w); (* pb *)
                     Get 2 (Temp 5w);
@@ -414,8 +414,8 @@ val word_gc_partial_or_full_def = Define `
                 (list_Seq full_code)]`;
 
 val SetNewTrigger_def = Define `
-  SetNewTrigger (endh:num) (ib:num) gs =
-    list_Seq [const_inst 1 ((get_gen_size gs):'a word);
+  SetNewTrigger (:'a) (endh:num) (ib:num) gs =
+    list_Seq [const_inst 1 (w2w ((get_gen_size gs):'a word));
               Get 7 AllocSize;
               move 4 endh;
               sub_inst 4 ib;
@@ -430,7 +430,7 @@ val SetNewTrigger_def = Define `
                    (Seq (add_inst 1 ib) (Set TriggerGC 1)))]`
 
 val word_gc_code_def = Define `
-  word_gc_code conf =
+  word_gc_code (:'a) conf =
     dtcase conf.gc_kind of
     | None =>
         (list_Seq
@@ -451,14 +451,14 @@ val word_gc_code_def = Define `
                Get 5 Globals;
                move 6 1;
                move 8 1;
-               word_gc_move_code conf;
+               word_gc_move_code (:'a) conf;
                Set Globals 5;
                const_inst 7 0w;
                StackLoadAny 9 8;
                move 8 7;
-               word_gc_move_roots_bitmaps_code conf;
+               word_gc_move_roots_bitmaps_code (:'a) conf;
                Get 8 OtherHeap;
-               word_gc_move_loop_code conf;
+               word_gc_move_loop_code (:'a) conf;
                Get 0 CurrHeap;
                Get 1 OtherHeap;
                Get 2 HeapLength;
@@ -488,18 +488,18 @@ val word_gc_code_def = Define `
                Get 3 OtherHeap;
                right_shift_inst 4 (shift (:'a));
                move 6 3;
-               word_gen_gc_partial_move_code conf;
+               word_gen_gc_partial_move_code (:'a) conf;
                Set Globals 5;
                const_inst 8 0w;
                StackLoadAny 9 8;
-               word_gen_gc_partial_move_roots_bitmaps_code conf;
+               word_gen_gc_partial_move_roots_bitmaps_code (:'a) conf;
                Get 8 CurrHeap;
                Get 9 HeapLength;
                add_inst 9 8;
                Get 8 EndOfHeap;
-               word_gen_gc_partial_move_ref_list_code conf;
+               word_gen_gc_partial_move_ref_list_code (:'a) conf;
                Get 8 OtherHeap;
-               word_gen_gc_partial_move_data_code conf;
+               word_gen_gc_partial_move_data_code (:'a) conf;
                Get 2 OtherHeap;
                move 0 3;
                sub_inst 0 2;
@@ -507,12 +507,12 @@ val word_gc_code_def = Define `
                Get 3 GenStart;
                Get 1 CurrHeap;
                add_inst 3 1;
-               memcpy_code;
+               memcpy_code (:'a);
                Get 0 NextFree;
                Set NextFree 3;
                Get 8 EndOfHeap;
                Get 2 TriggerGC;
-               SetNewTrigger 8 3 gen_sizes;
+               SetNewTrigger (:'a) 8 3 gen_sizes;
                const_inst 1 0w;
                Set (Temp 0w) 1;
                Set (Temp 1w) 1;
@@ -530,7 +530,7 @@ val word_gc_code_def = Define `
               (* gen_gc_full *)
               [Set AllocSize 1;
                Set NextFree 0;
-               const_inst 1 (0w:'a word);
+               const_inst 1 0w;
                move 2 1;
                Get 3 OtherHeap;
                Get 4 HeapLength;
@@ -548,12 +548,12 @@ val word_gc_code_def = Define `
                Get 5 Globals;
                move 6 1;
                move 8 1;
-               word_gen_gc_move_code conf;
+               word_gen_gc_move_code (:'a) conf;
                Set Globals 5;
                const_inst 7 0w;
                StackLoadAny 9 8;
                move 8 7;
-               word_gen_gc_move_roots_bitmaps_code conf;
+               word_gen_gc_move_roots_bitmaps_code (:'a) conf;
                Get 2 (Temp 2w);
                Get 8 OtherHeap;
                move 7 3;
@@ -562,7 +562,7 @@ val word_gc_code_def = Define `
                move 6 2;
                sub_inst 6 1;
                or_inst 7 6;
-               word_gen_gc_move_loop_code conf;
+               word_gen_gc_move_loop_code (:'a) conf;
                Get 0 CurrHeap;
                Get 1 OtherHeap;
                Get 2 (Temp 2w);
@@ -574,7 +574,7 @@ val word_gc_code_def = Define `
                move 8 3;
                sub_inst 8 1;
                Set GenStart 8;
-               SetNewTrigger 2 3 gen_sizes;
+               SetNewTrigger (:'a) 2 3 gen_sizes;
                const_inst 1 0w;
                Set (Temp 0w) 1;
                Set (Temp 1w) 1;
@@ -586,11 +586,10 @@ val word_gc_code_def = Define `
                Get 1 AllocSize;
                Get 2 TriggerGC;
                sub_inst 2 3;
-               If Lower 2 (Reg 1) (Seq (const_inst 1 1w) (Halt 1)) Skip ])
-                 :'a stackLang$prog`
+               If Lower 2 (Reg 1) (Seq (const_inst 1 1w) (Halt 1)) Skip ])`
 
 val stubs_def = Define `
-  stubs conf = [(gc_stub_location,Seq (word_gc_code conf) (Return 0 0))]`
+  stubs (:'a) conf = [(gc_stub_location,Seq (word_gc_code (:'a) conf) (Return 0 0))]`
 
 val stub_names_def = Define`
   stub_names () = [(gc_stub_location,«_Gc»)]`
@@ -599,7 +598,7 @@ val stub_names_def = Define`
 
 local
 val next_lab_quotation = `
-  next_lab (p:'a stackLang$prog) aux =
+  next_lab p aux =
     dtcase p of
     | Seq p1 p2 => next_lab p1 (next_lab p2 aux)
     | If _ _ _ p1 p2 => next_lab p1 (next_lab p2 aux)
@@ -667,6 +666,6 @@ val prog_comp_def = Define `
   prog_comp (n,p) = (n,FST (comp n (next_lab p 2) p))`
 
 val compile_def = Define `
-  compile c prog = stubs c ++ MAP prog_comp prog`;
+  compile (:'a) c prog = stubs (:'a) c ++ MAP prog_comp prog`;
 
 val _ = export_theory();

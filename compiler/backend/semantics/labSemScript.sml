@@ -177,19 +177,15 @@ val fp_upd_def = Define `
      upd_fp_reg d1
        (fpSem$fpfma (read_fp_reg d1 s) (read_fp_reg d2 s) (read_fp_reg d3 s)) s) /\
   (fp_upd (FPMovToReg r1 r2 d) s =
-     if r1 = r2 then
-       upd_reg r1 (Word (w2w (read_fp_reg d s))) s
-     else let v = read_fp_reg d s in
-       upd_reg r2 (Word ((63 >< 32) v)) (upd_reg r1 (Word ((31 >< 0) v)) s)) /\
+     let v = read_fp_reg d s in
+       (if dimindex(:'a) = 64 then
+          upd_reg r2 (Word 0w) (upd_reg r1 (Word (w2w v)) s)
+        else
+          upd_reg r2 (Word ((63 >< 32) v)) (upd_reg r1 (Word ((31 >< 0) v)) s))) /\
   (fp_upd (FPMovFromReg d r1 r2) s =
-     if r1 = r2 then
-       case read_reg r1 s of
-         Word w1 => upd_fp_reg d (w2w w1) s
-       | _ => assert F s
-     else
-       case (read_reg r1 s,read_reg r2 s) of
-         (Word w1,Word w2) => upd_fp_reg d (w2 @@ w1) s
-       | _ => assert F s) /\
+     case (read_reg r1 s,read_reg r2 s) of
+       (Word w1,Word w2) => upd_fp_reg d (w2 @@ w1) s
+     | _ => assert F s) /\
   (fp_upd (FPToInt d1 d2) s =
      case fp64_to_int roundTiesToEven (read_fp_reg d2 s) of
          SOME i =>

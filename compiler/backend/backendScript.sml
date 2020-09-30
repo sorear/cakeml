@@ -28,7 +28,7 @@ val _ = Datatype`config =
    ; word_to_word_conf : word_to_word$config
    ; word_conf : 'a word_to_stack$config
    ; stack_conf : stack_to_lab$config
-   ; lab_conf : 'a lab_to_target$config
+   ; lab_conf : lab_to_target$config
    ; symbols : (mlstring # num # num) list
    ; tap_conf : tap_config
    |>`;
@@ -44,7 +44,7 @@ val attach_bitmaps_def = Define `
   attach_bitmaps names c NONE = NONE`
 
 val compile_tap_def = Define`
-  compile_tap c p =
+  compile_tap (c:'a config) p =
     let (c',p) = source_to_flat$compile c.source_conf p in
     let td = tap_flat c.tap_conf p [] in
     let _ = empty_ffi (strlit "finished: source_to_flat") in
@@ -62,7 +62,7 @@ val compile_tap_def = Define`
     let p = bvi_to_data$compile_prog p in
     let td = tap_data_lang c.tap_conf (p,names) td in
     let _ = empty_ffi (strlit "finished: bvi_to_data") in
-    let (col,p) = data_to_word$compile c.data_conf c.word_to_word_conf c.lab_conf.asm_conf p in
+    let (col,p:(num#num#'a wordLang$prog) list) = data_to_word$compile c.data_conf c.word_to_word_conf c.lab_conf.asm_conf p in
     let c = c with word_to_word_conf updated_by (λc. c with col_oracle := col) in
     let names = sptree$union (sptree$fromAList $ (data_to_word$stub_names () ++
       word_to_stack$stub_names () ++ stack_alloc$stub_names () ++
@@ -124,9 +124,9 @@ val to_data_def = Define`
   (c,p,names)`;
 
 val to_word_def = Define`
-  to_word c p =
+  to_word (c:'a config) p =
   let (c,p,names) = to_data c p in
-  let (col,p) = data_to_word$compile c.data_conf c.word_to_word_conf c.lab_conf.asm_conf p in
+  let (col,p:(num # num # 'a wordLang$prog) list) = data_to_word$compile c.data_conf c.word_to_word_conf c.lab_conf.asm_conf p in
   let c = c with word_to_word_conf updated_by (λc. c with col_oracle := col) in
   (c,p,names)`;
 
@@ -138,7 +138,7 @@ val to_stack_def = Define`
   (c,p,names)`;
 
 val to_lab_def = Define`
-  to_lab c p =
+  to_lab (c:'a config) p =
   let (c,p,names) = to_stack c p in
   let p = stack_to_lab$compile
     c.stack_conf c.data_conf (2 * max_heap_limit (:'a) c.data_conf - 1)
@@ -180,7 +180,7 @@ val from_lab_def = Define`
     attach_bitmaps names c (lab_to_target$compile c.lab_conf p)`;
 
 val from_stack_def = Define`
-  from_stack c names p =
+  from_stack (c:'a config) names p =
   let p = stack_to_lab$compile
     c.stack_conf c.data_conf (2 * max_heap_limit (:'a) c.data_conf - 1)
     (c.lab_conf.asm_conf.reg_count - (LENGTH c.lab_conf.asm_conf.avoid_regs +3))
@@ -188,7 +188,7 @@ val from_stack_def = Define`
   from_lab c names (p:'a prog)`;
 
 val from_word_def = Define`
-  from_word c names p =
+  from_word (c:'a config) names (p:(num # num # 'a wordLang$prog) list) =
   let (c',fs,p) = word_to_stack$compile c.lab_conf.asm_conf p in
   let c = c with word_conf := c' in
   from_stack c names p`;
@@ -226,7 +226,7 @@ val from_flat_def = Define`
   from_clos c p`;
 
 val from_source_def = Define`
-  from_source c p =
+  from_source (c:'a config) p:(word8 list # 'a word list # 'a config) option =
   let (c',p) = source_to_flat$compile c.source_conf p in
   let c = c with source_conf := c' in
   from_flat c p`;
@@ -274,7 +274,7 @@ val to_livesets_def = Define`
     ((reg_count,data),c',names,p)`
 
 val from_livesets_def = Define`
-  from_livesets c ((k,data),c',names,p) =
+  from_livesets (c:'a config) ((k,data),c',names,p):(word8 list # 'a word list # 'a config) option =
   let (word_conf,asm_conf) = (c.word_to_word_conf,c.lab_conf.asm_conf) in
   let (n_oracles,col) = next_n_oracle (LENGTH p) word_conf.col_oracle in
   let alg = word_conf.reg_alg in

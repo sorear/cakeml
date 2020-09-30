@@ -244,10 +244,10 @@ val fp_ok_def = Define `
       fp_reg_ok d1 c /\ fp_reg_ok d2 c /\ fp_reg_ok d3 c) /\
   (fp_ok (FPMov d1 d2) c <=> fp_reg_ok d1 c /\ fp_reg_ok d2 c) /\
   (fp_ok (FPMovToReg r1 r2 d) c <=>
-      reg_ok r1 c /\ reg_ok r2 c /\
+      reg_ok r1 c /\ reg_ok r2 c /\ r1 <> r2 /\
       fp_reg_ok d c) /\
   (fp_ok (FPMovFromReg d r1 r2) c <=>
-      reg_ok r1 c /\ reg_ok r2 c /\
+      reg_ok r1 c /\ reg_ok r2 c /\ r1 <> r2 /\
       fp_reg_ok d c) /\
   (fp_ok (FPToInt r d) c <=> fp_reg_ok r c /\ fp_reg_ok d c) /\
   (fp_ok (FPFromInt d r) c <=> fp_reg_ok r c /\ fp_reg_ok d c)`

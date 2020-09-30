@@ -191,13 +191,9 @@ val ssa_cc_trans_inst_def = Define`
     let (r',ssa',na') = next_var_rename r ssa na in
       (Inst (FP (FPEqual r' f1 f2)),ssa',na')) ∧
   (ssa_cc_trans_inst (FP (FPMovToReg r1 r2 d)) ssa na =
-    if r1 = r2 then
-      let (r1',ssa',na') = next_var_rename r1 ssa na in
-        (Inst (FP (FPMovToReg r1' r1' d)),ssa',na')
-    else
-      let (r1',ssa',na') = next_var_rename r1 ssa na in
-      let (r2',ssa'',na'') = next_var_rename r2 ssa' na' in
-        (Inst (FP (FPMovToReg r1' r2' d)),ssa'',na'')) ∧
+    let (r1',ssa',na') = next_var_rename r1 ssa na in
+    let (r2',ssa'',na'') = next_var_rename r2 ssa' na' in
+      (Inst (FP (FPMovToReg r1' r2' d)),ssa'',na'')) ∧
   (ssa_cc_trans_inst (FP (FPMovFromReg d r1 r2)) ssa na =
     let r1' = option_lookup ssa r1 in
     let r2' = (dtcase lookup r2 ssa of NONE => 4 | SOME v => v) in
@@ -1129,11 +1125,9 @@ val get_forced_def = Define`
        else
          acc
     | FP (FPMovToReg r1 r2 d) =>
-        (if r1 ≠ r2 then [(r1,r2)]
-        else []) ++ acc
+        (if r1=r2 then [] else [(r1,r2)]) ++ acc
     | FP (FPMovFromReg d r1 r2) =>
-        (if r1 ≠ r2 then [(r1,r2)]
-        else []) ++ acc
+        (if r1=r2 then [] else [(r1,r2)]) ++ acc
     | _ => acc) ∧
   (get_forced c (MustTerminate s1) acc =
     get_forced c s1 acc) ∧
@@ -1177,11 +1171,9 @@ Theorem get_forced_pmatch:
        else
          acc
     | Inst (FP (FPMovToReg r1 r2 d)) =>
-        (if r1 ≠ r2 then [(r1,r2)]
-        else []) ++ acc
+        (if r1=r2 then [] else [(r1,r2)]) ++ acc
     | Inst (FP (FPMovFromReg d r1 r2)) =>
-        (if r1 ≠ r2 then [(r1,r2)]
-        else []) ++ acc
+        (if r1=r2 then [] else [(r1,r2)]) ++ acc
     | MustTerminate s1 => get_forced c s1 acc
     | Seq s1 s2 => get_forced c s1 (get_forced c s2 acc)
     | If cmp num rimm e2 e3 =>

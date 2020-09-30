@@ -125,15 +125,11 @@ val fp_upd_def = Define `
        (fp64_mul_add roundTiesToEven (read_fp_reg d2 s) (read_fp_reg d3 s) (read_fp_reg d1 s)) s) /\
   (fp_upd (FPMovToReg r1 r2 d) (s : 'a asm_state) =
      if dimindex(:'a) = 64 then
-       upd_reg r1 (w2w (read_fp_reg d s)) s
+       upd_reg r2 0w (upd_reg r1 (w2w (read_fp_reg d s)) s)
      else let v = read_fp_reg d s in
        upd_reg r2 ((63 >< 32) v) (upd_reg r1 ((31 >< 0) v) s)) /\
   (fp_upd (FPMovFromReg d r1 r2) (s : 'a asm_state) =
-     upd_fp_reg d
-       (if dimindex(:'a) = 64 then
-          w2w (read_reg r1 s)
-        else
-          read_reg r2 s @@ read_reg r1 s) s) /\
+     upd_fp_reg d (read_reg r2 s @@ read_reg r1 s) s) /\
   (fp_upd (FPToInt d1 d2) (s : 'a asm_state) =
      case fp64_to_int roundTiesToEven (read_fp_reg d2 s) of
          SOME i =>
