@@ -8,6 +8,7 @@ open preamble
      stackPropsTheory
      set_sepTheory
      semanticsPropsTheory
+     labPropsTheory
      helperLib
 local open dep_rewrite blastLib in end
 
@@ -113,11 +114,11 @@ Proof
   \\ full_simp_tac(srw_ss())[dimword_def]
 QED
 
-Theorem word_offset_eq:
-   word_offset n = bytes_in_word * n2w n
+(*Theorem word_offset_eq:
+   word_offset (:'a) n = w2w (bytes_in_word * n2w n:'a word)
 Proof
   full_simp_tac(srw_ss())[word_offset_def,word_mul_n2w,bytes_in_word_def]
-QED
+QED*)
 
 val memory_def = Define `
   memory m dm = \s. s = fun2set (m, dm)`;
@@ -134,11 +135,11 @@ val word_store_def = Define `
                    | NONE => Word 0w | SOME x => x) store_list)`
 
 val code_rel_def = Define `
-  code_rel jump off k code1 code2 <=>
+  code_rel (:'a) jump off k code1 code2 <=>
     (!n prog.
       lookup n code1 = SOME prog ==>
       reg_bound prog k /\
-      lookup n code2 = SOME (comp jump off k prog)) ∧
+      lookup n code2 = SOME (comp (:'a) jump off k prog)) ∧
     domain code2 = domain code1 ∪ {0;1;2}` (* exact characterization for Install *)
 
 val is_SOME_Word_def = Define `
@@ -160,15 +161,15 @@ val state_rel_def = Define `
     s2.ffi_save_regs = s1.ffi_save_regs /\
     s2.fp_regs = s1.fp_regs /\
     s2.code_buffer = s1.code_buffer /\
-    s1.compile = (λc p. s2.compile c (MAP (prog_comp jump off k) p)) /\
+    s1.compile = (λc p. s2.compile c (MAP (prog_comp (:'a) jump off k) p)) /\
     (* s2.data_buffer = empty_buffer /\ *)
-    s2.compile_oracle = (λn. (I ## MAP (prog_comp jump off k) ## I (*K []*)) (s1.compile_oracle n)) /\
+    s2.compile_oracle = (λn. (I ## MAP (prog_comp (:'a) jump off k) ## I (*K []*)) (s1.compile_oracle n)) /\
     (∀n i p. MEM (i,p) (FST(SND(s1.compile_oracle n ))) ⇒ reg_bound p k ∧ num_stubs ≤ i+1) ∧
     good_dimindex (:'a) /\
     (!n.
        n < k ==>
        FLOOKUP s2.regs n = FLOOKUP s1.regs n) /\
-    code_rel jump off k s1.code s2.code /\
+    code_rel (:'a) jump off k s1.code s2.code /\
     lookup stack_err_lab s2.code = SOME (halt_inst 2w) /\
     FLOOKUP s2.regs (k+2) = FLOOKUP s1.store CurrHeap /\
     {k;k+1;k+2} SUBSET s2.ffi_save_regs /\
@@ -208,30 +209,30 @@ val state_rel_with_clock = Q.prove(
   \\ srw_tac[][] \\ res_tac \\ full_simp_tac(srw_ss())[])
 
 Theorem state_rel_const:
-   state_rel jump off k s t ⇒
+   state_rel jump off k (s:('a,'c,'ffi) stackSem$state) t ⇒
    t.code_buffer = s.code_buffer ∧
    ¬t.use_stack ∧ s.use_stack ∧
-   t.compile_oracle = (λn. (I ## MAP (prog_comp jump off k) ## I (*K []*)) (s.compile_oracle n)) ∧
-   s.compile = (λc p. t.compile c (MAP (prog_comp jump off k) p))
+   t.compile_oracle = (λn. (I ## MAP (prog_comp (:'a) jump off k) ## I (*K []*)) (s.compile_oracle n)) ∧
+   s.compile = (λc p. t.compile c (MAP (prog_comp (:'a) jump off k) p))
 Proof
   fs[state_rel_def]
 QED
 
 val find_code_lemma = Q.prove(
-  `state_rel jump off k s t1 /\
+  `state_rel jump off k (s:('a,'c,'ffi) stackSem$state) t1 /\
     (case dest of INL v2 => T | INR i => i < k) /\
     find_code dest s.regs s.code = SOME x ==>
-    find_code dest t1.regs t1.code = SOME (comp jump off k x) /\ reg_bound x k`,
+    find_code dest t1.regs t1.code = SOME (comp (:'a) jump off k x) /\ reg_bound x k`,
   CASE_TAC \\ full_simp_tac(srw_ss())[find_code_def,state_rel_def,code_rel_def]
   \\ strip_tac \\ res_tac
   \\ CASE_TAC \\ full_simp_tac(srw_ss())[] \\ CASE_TAC \\ full_simp_tac(srw_ss())[]
   \\ CASE_TAC \\ full_simp_tac(srw_ss())[] \\ res_tac);
 
 val find_code_lemma2 = Q.prove(
-  `state_rel jump off k s t1 /\
+  `state_rel jump off k (s:('a,'c,'ffi) stackSem$state) t1 /\
     (case dest of INL v2 => T | INR i => i < k) /\
     find_code dest (s.regs \\ x1) s.code = SOME x ==>
-    find_code dest (t1.regs \\ x1) t1.code = SOME (comp jump off k x) /\ reg_bound x k`,
+    find_code dest (t1.regs \\ x1) t1.code = SOME (comp (:'a) jump off k x) /\ reg_bound x k`,
   CASE_TAC \\ full_simp_tac(srw_ss())[find_code_def,state_rel_def,code_rel_def]
   \\ strip_tac \\ res_tac
   \\ fs[DOMSUB_FLOOKUP_THM]

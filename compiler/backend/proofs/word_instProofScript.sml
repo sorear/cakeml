@@ -3,6 +3,7 @@
 *)
 open preamble
      wordLangTheory wordPropsTheory word_instTheory wordSemTheory
+     labPropsTheory (* good_dimindex *)
      asmTheory
 
 val _ = temp_delsimps ["NORMEQ_CONV"]
@@ -368,11 +369,18 @@ val flatten_exp_every_var_exp = Q.prove(`
   every_var_exp P (flatten_exp exp)`,
   ho_match_mp_tac flatten_exp_ind>>full_simp_tac(srw_ss())[op_consts_def,flatten_exp_def,every_var_exp_def,EVERY_MEM,EVERY_MAP]);
 
+Theorem w2w_sw2sw_index:
+  labProps$good_dimindex (:'a) ==> w2w (sw2sw (w:'a word):word64):'a word = w
+Proof
+  cheat
+QED
+
 (* inst_select correctness
   Main difficulty: Dealing with multiple choice of optimizations, depending on whether we are allowed to use them w.r.t. to the asm configuration
 *)
 val inst_select_exp_thm = Q.prove(`
   ∀c tar temp exp s w loc.
+  labProps$good_dimindex (:'a) /\
   binary_branch_exp exp ∧
   every_var_exp (λx. x < temp) exp ∧
   locals_rel temp s.locals loc ∧
@@ -387,12 +395,12 @@ val inst_select_exp_thm = Q.prove(`
   completeInduct_on`exp_size (K 0) exp`>>
   rpt strip_tac>>
   Cases_on`exp`>>
-  full_simp_tac(srw_ss())[evaluate_def,binary_branch_exp_def,every_var_exp_def]
+  full_simp_tac(srw_ss())[evaluate_def,binary_branch_exp_def,every_var_exp_def,w2w_sw2sw_index]
   >-
     (simp[inst_select_exp_def]>>
     full_simp_tac(srw_ss())[LET_THM,evaluate_def,inst_def,mem_load_def,assign_def,word_exp_def,set_var_def,mem_load_def,word_op_def]>>
     simp[state_component_equality,locals_rel_def,lookup_insert]>>
-    full_simp_tac(srw_ss())[locals_rel_def])
+    full_simp_tac(srw_ss())[locals_rel_def,w2w_sw2sw_index])
   >-
     (simp[inst_select_exp_def]>>
     full_simp_tac(srw_ss())[LET_THM,evaluate_def,inst_def,mem_load_def,assign_def,word_exp_def,set_var_def,mem_load_def,word_op_def,get_vars_def,set_vars_def,get_var_def]>>
@@ -412,7 +420,7 @@ val inst_select_exp_thm = Q.prove(`
         (fs[binary_branch_exp_def,every_var_exp_def,word_exp_def,the_words_def]>>EVERY_CASE_TAC>>full_simp_tac(srw_ss())[IS_SOME_EXISTS]>>rev_full_simp_tac(srw_ss())[]>>
         last_x_assum mp_tac>>simp[Once PULL_FORALL]>>disch_then (qspec_then`exp'` mp_tac)>>simp[exp_size_def]>>strip_tac>>res_tac>>
         pop_assum(qspecl_then[`temp`,`c`] assume_tac)>>full_simp_tac(srw_ss())[evaluate_def,LET_THM]>>
-        simp[evaluate_def,LET_THM,inst_def,mem_load_def,assign_def,word_exp_def,the_words_def]>>
+        simp[evaluate_def,LET_THM,inst_def,mem_load_def,assign_def,word_exp_def,the_words_def,w2w_sw2sw_index]>>
         `lookup temp loc'' = SOME (Word c')` by metis_tac[]>>full_simp_tac(srw_ss())[mem_load_def]>>
         full_simp_tac(srw_ss())[state_component_equality,set_var_def,lookup_insert]>>srw_tac[][]>>
         DISJ2_TAC>>strip_tac>>`x' ≠ temp` by DECIDE_TAC>>metis_tac[])
@@ -471,11 +479,11 @@ val inst_select_exp_thm = Q.prove(`
           `lookup temp loc'' = SOME (Word c')` by metis_tac[]>>
           full_simp_tac(srw_ss())[word_op_def]>>
           Cases_on`b`>>
-          full_simp_tac(srw_ss())[set_var_def,state_component_equality,lookup_insert,word_exp_def]>>
+          full_simp_tac(srw_ss())[set_var_def,state_component_equality,lookup_insert,word_exp_def,w2w_sw2sw_index]>>
           srw_tac[][]>>DISJ2_TAC>>strip_tac>>`x ≠ temp` by DECIDE_TAC>>metis_tac[])
         >> IF_CASES_TAC
         >-
-          (simp[evaluate_def,LET_THM,inst_def,mem_load_def,assign_def,word_exp_def,set_var_def,lookup_insert,the_words_def]>>
+          (simp[evaluate_def,LET_THM,inst_def,mem_load_def,assign_def,word_exp_def,set_var_def,lookup_insert,the_words_def,w2w_sw2sw_index,WORD_w2w_OVER_MUL]>>
           `lookup temp loc'' = SOME (Word c')` by metis_tac[]>>
           full_simp_tac(srw_ss())[]>>rev_full_simp_tac(srw_ss())[word_exp_def,word_op_def]>>
           full_simp_tac(srw_ss())[state_component_equality,lookup_insert]>>srw_tac[][]>>

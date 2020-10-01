@@ -965,6 +965,12 @@ val env_to_list_K_I_IMP = Q.prove(
   \\ res_tac \\ fs [key_val_compare_def,LET_DEF]
   \\ pairarg_tac \\ fs [] \\ pairarg_tac \\ fs [])
 
+Theorem good_dimindex_w2w_n2w[simp]:
+  good_dimindex (:'a) ==> !n. w2w (n2w n:word64):'a word = n2w n
+Proof
+  fs[good_dimindex_def,w2w_n2w]
+QED
+
 val evaluate_wLive = Q.prove(
   `wLive names bs (k,f,f') = (wlive_prog,bs') /\
    (∀x. x ∈ domain names ⇒ EVEN x /\ k ≤ x DIV 2) /\
@@ -4444,18 +4450,10 @@ Proof
       fs[])
     (* FPMovToReg *)
     >-
-      (every_case_tac>>fs[]
-      >-
-        (strip_tac>>
-        fs[wordLangTheory.every_var_inst_def,reg_allocTheory.is_phy_var_def,GSYM EVEN_MOD2,EVEN_EXISTS]>>
-        rw[]>>
-        match_mp_tac wRegWrite1_thm1 >> fs[stackSemTheory.evaluate_def,stackSemTheory.inst_def]>>
-        imp_res_tac state_rel_get_fp_var>>
-        fs[])
-      >>
-      fs[wordLangTheory.every_var_inst_def,reg_allocTheory.is_phy_var_def,GSYM EVEN_MOD2,EVEN_EXISTS]>>
+      (every_case_tac>>fs[]>>
+      (fs[wordLangTheory.every_var_inst_def,reg_allocTheory.is_phy_var_def,GSYM EVEN_MOD2,EVEN_EXISTS]>>
       strip_tac>>
-      (* This case is a little bit harder than the rest because it is the only one
+       (* This case is a little bit harder than the rest because it is the only one
          involving a double write
       *)
       rw[wRegWrite2_def]
@@ -4541,30 +4539,10 @@ Proof
             (first_x_assum drule>>rw[]>>
             fs[EVEN_EXISTS]>>rw[]>>fs[TWOxDIV2])
           >-
-            metis_tac[])))
+            metis_tac[]))))
     >-
       (* FPMovFromReg *)
-      (IF_CASES_TAC >> fs[]
-      >-
-        (every_case_tac>>fs[]>>strip_tac>>
-        fs[wordLangTheory.every_var_inst_def,reg_allocTheory.is_phy_var_def,GSYM EVEN_MOD2,EVEN_EXISTS]>>
-        pairarg_tac>>fs[]>>
-        qho_match_abbrev_tac`∃t'. evaluate (wStackLoad l (kont n1'),t) = (NONE,t') ∧ _ t'`>>
-        simp[]>>
-        match_mp_tac (GEN_ALL wStackLoad_thm1)>>
-        rw[]>>
-        asm_exists_tac>>fs[]>>
-        asm_exists_tac>>fs[Abbr`kont`]>>rw[]>>
-        fs[stackSemTheory.evaluate_def,stackSemTheory.inst_def]
-        >-
-          (imp_res_tac state_rel_get_var_imp>>
-          simp[stackSemTheory.get_var_def]>>
-          fs[state_rel_set_fp_var,set_fp_var_stack])
-        >>
-          imp_res_tac state_rel_get_var_imp2>>
-          simp[]>>
-          fs[state_rel_set_fp_var,set_fp_var_stack])
-      >-
+      (fs[] >>
         (every_case_tac>>fs[]>>strip_tac>>
         pairarg_tac>>fs[]>>
         pairarg_tac>>fs[]>>
@@ -8583,8 +8561,8 @@ val make_init_def = Define `
      ; termdep := 0
      ; stack_limit := LENGTH t.stack
      ; stack_max   := stack_size([]:'a stack_frame list)
-     ; stack_size  := mapi (λn (arg_count,prog). FST (SND (compile_prog prog arg_count k []))) code
-     ; locals_size := SOME 0|> ` ;
+     ; stack_size  := mapi (λn (arg_count,prog). FST (SND (compile_prog prog arg_count k ([]:'a word list)))) code
+     ; locals_size := SOME 0 |> :('a, 'a word list # 'c, 'ffi) wordSem$state` ;
 
 
 val init_state_ok_IMP_state_rel = Q.prove(
@@ -8862,7 +8840,7 @@ val init_state_ok_semantics' =
 
 
 Theorem compile_semantics:
-   ^t.code = fromAList (SND (SND (compile asm_conf code))) /\
+   ^t.code = fromAList (SND (SND (compile asm_conf code : ('a config # num list # (num # stackLang$prog) list)))) /\
     k = (asm_conf.reg_count - (5 + LENGTH asm_conf.avoid_regs)) /\
     init_state_ok k t coracle /\
     (ALOOKUP code raise_stub_location = NONE) /\
@@ -8965,10 +8943,10 @@ QED
 
 Theorem word_to_stack_compile_lab_pres:
     EVERY (λn,m,p.
-    let labs = extract_labels p in
+    let labs = extract_labels (p:'a wordLang$prog) in
     EVERY (λ(l1,l2).l1 = n ∧ l2 ≠ 0 ∧ l2 ≠ 1) labs ∧
     ALL_DISTINCT labs) prog ⇒
-  let (c,f,p) = compile asm_cognf prog in
+  let (c:'a config,f,p) = compile asm_cognf prog in
     MAP FST p = (raise_stub_location::MAP FST prog) ∧
     EVERY (λn,p.
       let labs = extract_labels p in
@@ -9175,7 +9153,7 @@ val wLive_stack_asm_remove = Q.prove(`
   rveq>>EVAL_TAC>>fs[])
 
 Theorem word_to_stack_stack_asm_remove_lem:
-    ∀(p:'a wordLang$prog) bs kf (c:'a asm_config).
+    ∀(p:'a wordLang$prog) bs kf (c:asm_config).
   (FST kf)+1 < c.reg_count - LENGTH c.avoid_regs ⇒
   stack_asm_remove c (FST (comp p bs kf))
 Proof
@@ -9245,11 +9223,11 @@ QED
 
 Theorem word_to_stack_stack_asm_convs:
     EVERY (λ(n,m,p).
-  full_inst_ok_less c p ∧
+  full_inst_ok_less c (p:'a wordLang$prog) ∧
   (c.two_reg_arith ⇒ every_inst two_reg_inst p) ∧
   post_alloc_conventions (c.reg_count - (LENGTH c.avoid_regs +5)) p) progs ∧
   4 < (c.reg_count - (LENGTH c.avoid_regs +5)) ⇒
-  EVERY (λ(n,p). stack_asm_name c p ∧ stack_asm_remove c p) (SND(SND(compile c progs)))
+  EVERY (λ(n,p). stack_asm_name c p ∧ stack_asm_remove c p) (SND(SND(compile c progs:('a config#num list#(num#stackLang$prog) list))))
 Proof
   fs[compile_def]>>pairarg_tac>>rw[]
   >- (EVAL_TAC>>fs[])
@@ -9466,7 +9444,7 @@ QED
 
 (* Gluing all the conventions together *)
 Theorem word_to_stack_stack_convs:
-    word_to_stack$compile ac p = (c',f', p') ∧
+    word_to_stack$compile ac (p:(num # num # 'a wordLang$prog) list) = (c':'a config,f', p') ∧
   EVERY (post_alloc_conventions k) (MAP (SND o SND) p) ∧
   k = (ac.reg_count- (5 +LENGTH ac.avoid_regs)) ∧
   4 ≤ k
@@ -9510,9 +9488,7 @@ Proof
         qmatch_asmsub_abbrev_tac`word_to_stack$comp _ _ xxx `>>
         `k = FST xxx` by fs[Abbr`xxx`]>>
         pop_assum SUBST_ALL_TAC>>
-        imp_res_tac word_to_stack_reg_bound >>
-        imp_res_tac word_to_stack_call_args >>
-        metis_tac[FST])
+        metis_tac[FST,word_to_stack_reg_bound,word_to_stack_call_args])
     >>
     fs[AND_IMP_INTRO]>>
     first_x_assum match_mp_tac>>
@@ -9659,7 +9635,7 @@ Proof
 QED;
 
 Theorem word_to_stack_good_code_labels:
-  compile asm_conf progs = (bs,fs,prog') ∧
+  compile asm_conf (progs:(num # num # 'a wordLang$prog) list) = (bs:'a config,fs,prog') ∧
   good_code_labels progs elabs ⇒
   stack_good_code_labels prog' elabs
 Proof
@@ -9667,7 +9643,7 @@ Proof
   rpt(pairarg_tac>>fs[])>>
   fs[good_code_labels_def,stack_good_code_labels_def]>>
   rw[]>>
-  drule compile_word_to_stack_code_labels>>
+  drule (INST_TYPE [beta |-> alpha] compile_word_to_stack_code_labels)>>
   disch_then drule>>fs[]>>
   drule MAP_FST_compile_word_to_stack>>
   rw[]
@@ -9686,15 +9662,15 @@ QED;
 
 Theorem word_to_stack_good_code_labels_incr:
   raise_stub_location ∈ elabs ∧
-  compile_word_to_stack ac prog bs = (prog',fs', bs') ⇒
+  compile_word_to_stack ac (prog:(num # num # 'a wordLang$prog) list) (bs:'a word list) = (prog',fs', bs') ⇒
   good_code_labels prog elabs ⇒
   stack_good_code_labels prog' elabs
 Proof
   fs[good_code_labels_def,stack_good_code_labels_def]>>
   rw[]>>
-  drule compile_word_to_stack_code_labels>>
+  drule (INST_TYPE [beta |-> alpha] compile_word_to_stack_code_labels)>>
   disch_then drule>>fs[]>>
-  drule MAP_FST_compile_word_to_stack>>
+  drule (INST_TYPE [beta |-> gamma] MAP_FST_compile_word_to_stack)>>
   rw[]>>
   match_mp_tac SUBSET_TRANS>> asm_exists_tac>>simp[]>>
   rw[]
