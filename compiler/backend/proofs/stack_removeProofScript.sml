@@ -2421,7 +2421,7 @@ Proof
 QED
 
 val init_reduce_def = Define `
-  init_reduce gen_gc jump off k code bitmaps data_sp coracle (s:('a,'c,'ffi)stackSem$state) =
+  init_reduce gen_gc s_offs jump off k code bitmaps data_sp coracle (s:('a,'c,'ffi)stackSem$state) =
     let heap_ptr = theWord (s.regs ' (k + 2)) in
     let bitmap_ptr = theWord (s.regs ' 3) << word_shift (:'a) in
     let stack_ptr = theWord (s.regs ' k) in
@@ -2440,14 +2440,14 @@ val init_reduce_def = Define `
          data_buffer := <|buffer := []; position := (bitmap_ptr + bytes_in_word * n2w (LENGTH bitmaps)); space_left := data_sp|>;
          stack_space := stack_sp;
          stack := read_mem base_ptr s.memory (stack_sp + 1);
-         store := FEMPTY |++ (MAP (\n. case store_init gen_gc k n of
+         store := FEMPTY |++ (MAP (\n. case store_init s_offs gen_gc k n of
                                        | INL w => (n,Word w)
                                        | INR i => (n,s.regs ' i))
                                (CurrHeap::store_list)) |>`
 
 val init_reduce_stack_space = Q.prove(
-  `(init_reduce gen_gc jump off k code bitmaps data_sp coracle s8).stack_space <=
-    LENGTH (init_reduce gen_gc jump off k code bitmaps data_sp coracle s8).stack`,
+  `(init_reduce gen_gc s_offs jump off k code bitmaps data_sp coracle s8).stack_space <=
+    LENGTH (init_reduce gen_gc s_offs jump off k code bitmaps data_sp coracle s8).stack`,
   fs [init_reduce_def,LENGTH_read_mem]);
 
 Definition stack_heap_limit_ok_def:
@@ -2458,7 +2458,7 @@ Definition stack_heap_limit_ok_def:
 End
 
 val init_prop_def = Define `
-  init_prop gen_gc max_heap data_sp stack_heap_lim (s:('a,'c,'ffi)stackSem$state) =
+  init_prop gen_gc s_offs max_heap data_sp stack_heap_lim (s:('a,'c,'ffi)stackSem$state) =
     ?curr other bitmap_base len.
        FLOOKUP s.store CurrHeap = SOME (Word curr) /\
        FLOOKUP s.store NextFree = SOME (Word curr) /\
@@ -2466,6 +2466,7 @@ val init_prop_def = Define `
        FLOOKUP s.store EndOfHeap = SOME (Word other) /\
        FLOOKUP s.store OtherHeap = SOME (Word other) /\
        FLOOKUP s.store BitmapBase = SOME (Word bitmap_base) /\
+       FLOOKUP s.store StaticOffset = SOME (Word s_offs) /\
        FLOOKUP s.store HeapLength = SOME (Word (n2w len * bytes_in_word)) /\
        FLOOKUP s.store ProgStart = SOME (Word 0w) /\
        FLOOKUP s.store AllocSize = SOME (Word 0w) /\
@@ -2625,17 +2626,17 @@ Theorem init_code_thm:
     (∀n i p. MEM (i,p) (FST(SND(coracle n))) ⇒ reg_bound p k ∧ num_stubs ≤ i+1) ∧
     lookup stack_err_lab s.code = SOME (halt_inst 2w) /\
     max_stack_alloc <= max_heap ==>
-    case evaluate (init_code gen_gc max_heap k,s) of
+    case evaluate (init_code s_offs gen_gc max_heap k,s) of
     | (SOME res,t) => F
     | (NONE,t) =>
          (∃w2 w3 w4.
          FLOOKUP s.regs 2 = SOME (Word w2) ∧ byte_aligned w2 ∧
          FLOOKUP s.regs 4 = SOME (Word w4) ∧ byte_aligned w4 ∧ w2 <+ w4 ∧
          FLOOKUP s.regs 3 = SOME (Word w3)) ∧
-         state_rel jump off k (init_reduce gen_gc jump off k code bitmaps data_sp coracle t) t /\
+         state_rel jump off k (init_reduce gen_gc s_offs jump off k code bitmaps data_sp coracle t) t /\
          t.ffi = s.ffi /\
-         init_prop gen_gc max_heap data_sp (get_stack_heap_limit max_heap (read_pointers s))
-           (init_reduce gen_gc jump off k code bitmaps data_sp coracle t)
+         init_prop gen_gc s_offs max_heap data_sp (get_stack_heap_limit max_heap (read_pointers s))
+           (init_reduce gen_gc s_offs jump off k code bitmaps data_sp coracle t)
 Proof
   simp_tac std_ss [init_code_pre_def] \\ strip_tac
   \\ `k <> 3 /\ k <> 4 /\ k <> 5` by decide_tac
@@ -2938,7 +2939,7 @@ Proof
   \\ qpat_abbrev_tac `s7 = s with <| regs := _ ; memory := m4 |>`
   \\ drule (GEN_ALL store_list_code_thm)
   \\ disch_then (qspecl_then [`0`,`k+1`,
-       `(MAP (store_init gen_gc k) (REVERSE store_list))`,`s7`] mp_tac)
+       `(MAP (store_init s_offs gen_gc k) (REVERSE store_list))`,`s7`] mp_tac)
   \\ impl_tac THEN1
    (unabbrev_all_tac \\ fs [get_var_def] \\ tac
     \\ fs [EVERY_MAP]
@@ -3135,28 +3136,28 @@ Proof
 QED
 
 val make_init_opt_def = Define `
-  make_init_opt gen_gc max_heap bitmaps data_sp coracle jump off k code (s:('a,'c,'ffi)stackSem$state) =
-    case evaluate (init_code gen_gc max_heap k,s) of
+  make_init_opt gen_gc s_offs max_heap bitmaps data_sp coracle jump off k code (s:('a,'c,'ffi)stackSem$state) =
+    case evaluate (init_code s_offs gen_gc max_heap k,s) of
     | (SOME _,t) => NONE
-    | (NONE,t) => if init_prop gen_gc max_heap data_sp
+    | (NONE,t) => if init_prop gen_gc s_offs max_heap data_sp
                        (get_stack_heap_limit max_heap (read_pointers s))
-                       (init_reduce gen_gc jump off k code bitmaps data_sp coracle t)
-                  then SOME (init_reduce gen_gc jump off k code bitmaps data_sp coracle t) else NONE`
+                       (init_reduce gen_gc s_offs jump off k code bitmaps data_sp coracle t)
+                  then SOME (init_reduce gen_gc s_offs jump off k code bitmaps data_sp coracle t) else NONE`
 
 val init_pre_def = Define `
-  init_pre gen_gc max_heap bitmaps data_sp k start s <=>
-    lookup 0 s.code = SOME (Seq (init_code gen_gc max_heap k)
+  init_pre gen_gc s_offs max_heap bitmaps data_sp k start s <=>
+    lookup 0 s.code = SOME (Seq (init_code s_offs gen_gc max_heap k)
                                 (Call NONE (INL start) NONE)) /\
     init_code_pre k bitmaps data_sp s /\ max_stack_alloc ≤ max_heap`
 
 Theorem evaluate_init_code:
-   init_pre gen_gc max_heap bitmaps data_sp k start s /\
+   init_pre gen_gc s_offs max_heap bitmaps data_sp k start s /\
     s.compile_oracle = ((I ## MAP (prog_comp jump off k) ## I) o coracle) /\
     (∀n i p. MEM (i,p) (FST(SND(coracle n))) ⇒ reg_bound p k ∧ num_stubs ≤ i+1) ∧
     lookup stack_err_lab s.code = SOME (halt_inst 2w) /\
     code_rel jump off k code s.code ==>
-    case evaluate (init_code gen_gc max_heap k,s) of
-    | (NONE,t) => ?r. make_init_opt gen_gc max_heap bitmaps data_sp coracle jump off k code s = SOME r /\
+    case evaluate (init_code s_offs gen_gc max_heap k,s) of
+    | (NONE,t) => ?r. make_init_opt gen_gc s_offs max_heap bitmaps data_sp coracle jump off k code s = SOME r /\
                       state_rel jump off k r t /\ t.ffi = s.ffi
     | _ => F
 Proof
@@ -3176,8 +3177,8 @@ Proof
 QED
 
 val evaluate_init_code_clock = Q.prove(
-  `evaluate (init_code gen_gc max_heap k,s) = (res,t) ==>
-    evaluate (init_code gen_gc max_heap k,s with clock := c) =
+  `evaluate (init_code s_offs gen_gc max_heap k,s) = (res,t) ==>
+    evaluate (init_code s_offs gen_gc max_heap k,s with clock := c) =
       (res,t with clock := c)`,
   srw_tac[][] \\ match_mp_tac evaluate_clock_neutral \\ fs []
   \\ fs [clock_neutral_def,init_code_def] \\ rw []
@@ -3185,8 +3186,8 @@ val evaluate_init_code_clock = Q.prove(
          list_Seq_def,init_memory_def,clock_neutral_store_list_code]);
 
 Theorem evaluate_init_code_ffi:
-   evaluate (init_code gen_gc max_heap k,(s:('a,'c,'ffi) stackSem$state)) = (res,t) ==>
-    evaluate (init_code gen_gc max_heap k,s with ffi := c) =
+   evaluate (init_code s_offs gen_gc max_heap k,(s:('a,'c,'ffi) stackSem$state)) = (res,t) ==>
+    evaluate (init_code s_offs gen_gc max_heap k,s with ffi := c) =
       (res,(t with ffi := c):('a,'c,'ffi) stackSem$state)
 Proof
   srw_tac[][] \\ match_mp_tac evaluate_ffi_neutral \\ fs []
@@ -3198,14 +3199,14 @@ QED
 Theorem init_semantics:
    lookup stack_err_lab s.code = SOME (halt_inst 2w) /\
     code_rel jump off k code s.code /\
-    init_pre gen_gc max_heap bitmaps data_sp k start s ∧
+    init_pre gen_gc s_offs max_heap bitmaps data_sp k start s ∧
     s.compile_oracle = ((I ## MAP (prog_comp jump off k) ## I) o coracle) /\
     (∀n i p. MEM (i,p) (FST(SND(coracle n))) ⇒ reg_bound p k ∧ num_stubs ≤ i+1)
     ==>
-    case evaluate (init_code gen_gc max_heap k,s) of
+    case evaluate (init_code s_offs gen_gc max_heap k,s) of
     | (NONE,t) =>
         (semantics 0 s = semantics start t) /\
-        ?r. make_init_opt gen_gc max_heap bitmaps data_sp coracle jump off k code s = SOME r /\
+        ?r. make_init_opt gen_gc s_offs max_heap bitmaps data_sp coracle jump off k code s = SOME r /\
             state_rel jump off k r t
     | _ => F
 Proof
@@ -3260,13 +3261,13 @@ Proof
 QED
 
 Theorem make_init_opt_SOME_semantics:
-   init_pre gen_gc max_heap bitmaps data_sp k start s2 /\
+   init_pre gen_gc s_offs max_heap bitmaps data_sp k start s2 /\
     s2.compile_oracle = ((I ## MAP (prog_comp jump off k) ## I) o coracle) /\
     (∀n i p. MEM (i,p) (FST(SND(coracle n))) ⇒ reg_bound p k ∧ num_stubs ≤ i+1) ∧
     code_rel jump off k code s2.code /\
     lookup stack_err_lab s2.code = SOME (halt_inst 2w) ==>
     ?s1.
-      make_init_opt gen_gc max_heap bitmaps data_sp coracle jump off k code s2 = SOME s1 /\
+      make_init_opt gen_gc s_offs max_heap bitmaps data_sp coracle jump off k code s2 = SOME s1 /\
       (semantics start s1 <> Fail ==>
        semantics 0 s2 = semantics start s1)
 Proof
@@ -3278,7 +3279,7 @@ QED
 
 val IMP_code_rel = Q.prove(
   `EVERY (\(n,p). reg_bound p k /\ num_stubs ≤ n+1) code1 /\
-   code2 = fromAList (compile jump off gen_gc max_heap k start code1) ==>
+   code2 = fromAList (compile jump off s_offs gen_gc max_heap k start code1) ==>
    code_rel jump off k (fromAList code1) code2`,
   rw[]>>
   fs[code_rel_def,lookup_fromAList]>>
@@ -3294,8 +3295,8 @@ val IMP_code_rel = Q.prove(
   metis_tac[]);
 
 val make_init_any_def = Define `
-  make_init_any gen_gc max_heap bitmaps data_sp coracle jump off k code s =
-    case make_init_opt gen_gc max_heap bitmaps data_sp coracle jump off k code s of
+  make_init_any gen_gc s_offs max_heap bitmaps data_sp coracle jump off k code s =
+    case make_init_opt gen_gc s_offs max_heap bitmaps data_sp coracle jump off k code s of
     | SOME t => t
     | NONE => s with <| regs := FEMPTY |+ (0,Loc 1 0)
                       ; fp_regs := FEMPTY
@@ -3315,12 +3316,12 @@ val make_init_any_def = Define `
                                    (CurrHeap::store_list)) |>`
 
 val discharge_these_def = Define`
-  discharge_these jump off gen_gc max_heap k start coracle code s2 ⇔
+  discharge_these jump off s_offs gen_gc max_heap k start coracle code s2 ⇔
       EVERY (\(n,p). reg_bound p k /\ num_stubs ≤ n+1) code /\
       (∀n i p.
         MEM (i,p) (FST (SND (coracle n))) ⇒ reg_bound p k ∧ num_stubs ≤ i + 1) ∧
       s2.compile_oracle = (I ## MAP (prog_comp jump off k) ## I) ∘ coracle ∧
-      s2.code = fromAList (compile jump off gen_gc max_heap k start code) ∧
+      s2.code = fromAList (compile jump off s_offs gen_gc max_heap k start code) ∧
       8 ≤ k ∧ 1 ∈ domain s2.code ∧
       {k; k + 1; k + 2} ⊆ s2.ffi_save_regs ∧ ¬s2.use_stack ∧
       ¬s2.use_store ∧ ¬s2.use_alloc ∧ max_stack_alloc <= max_heap`;
@@ -3353,10 +3354,10 @@ val propagate_these_def = Define`
          (fun2set (s.memory,s.mdomain))`;
 
 Theorem make_init_semantics:
-   discharge_these jump off gen_gc max_heap k start coracle code s2 /\
+   discharge_these jump off s_offs gen_gc max_heap k start coracle code s2 /\
    propagate_these s2 bitmaps data_sp ==>
    ?s1.
-     make_init_opt gen_gc max_heap (bitmaps:'a word list) data_sp coracle jump off k (fromAList code) s2 = SOME s1 /\
+     make_init_opt gen_gc s_offs max_heap (bitmaps:'a word list) data_sp coracle jump off k (fromAList code) s2 = SOME s1 /\
      (semantics start s1 <> Fail
       ==>
       semantics 0 s2 = semantics start s1)
@@ -3372,7 +3373,7 @@ Proof
 QED
 
 Theorem make_init_any_ffi:
-   (make_init_any gen_gc max_heap bitmaps data_sp coracle jump off k code s).ffi =
+   (make_init_any gen_gc s_offs max_heap bitmaps data_sp coracle jump off k code s).ffi =
     (s:('a,'c,'ffi) stackSem$state).ffi
 Proof
   fs [make_init_any_def,make_init_opt_def,init_reduce_def]
@@ -3384,8 +3385,8 @@ Proof
 QED
 
 Theorem make_init_any_bitmaps:
-   (make_init_any gen_gc max_heap bitmaps data_sp coracle jump off k code s).bitmaps =
-       if IS_SOME (make_init_opt gen_gc max_heap bitmaps data_sp coracle jump off k code s)
+   (make_init_any gen_gc s_offs max_heap bitmaps data_sp coracle jump off k code s).bitmaps =
+       if IS_SOME (make_init_opt gen_gc s_offs max_heap bitmaps data_sp coracle jump off k code s)
        then bitmaps else [4w]
 Proof
   fs [make_init_any_def,make_init_opt_def,init_reduce_def]
@@ -3393,35 +3394,35 @@ Proof
 QED
 
 Theorem make_init_any_use_stack:
-   (make_init_any gen_gc max_heap bitmaps data_sp coracle jump off k code s).use_stack
+   (make_init_any gen_gc s_offs max_heap bitmaps data_sp coracle jump off k code s).use_stack
 Proof
   fs [make_init_any_def,make_init_opt_def,init_reduce_def]
   \\ every_case_tac \\ fs []
 QED
 
 Theorem make_init_any_use_store:
-   (make_init_any gen_gc max_heap bitmaps data_sp coracle jump off k code s).use_store
+   (make_init_any gen_gc s_offs max_heap bitmaps data_sp coracle jump off k code s).use_store
 Proof
   fs [make_init_any_def,make_init_opt_def,init_reduce_def]
   \\ every_case_tac \\ fs []
 QED
 
 Theorem make_init_any_use_alloc:
-   ~(make_init_any gen_gc max_heap bitmaps data_sp coracle jump off k code s).use_alloc
+   ~(make_init_any gen_gc s_offs max_heap bitmaps data_sp coracle jump off k code s).use_alloc
 Proof
   fs [make_init_any_def,make_init_opt_def,init_reduce_def]
   \\ every_case_tac \\ fs []
 QED
 
 Theorem make_init_any_code:
-   (make_init_any gen_gc max_heap bitmaps data_sp coracle jump off k code s).code = code
+   (make_init_any gen_gc s_offs max_heap bitmaps data_sp coracle jump off k code s).code = code
 Proof
   fs [make_init_any_def,make_init_opt_def,init_reduce_def]
   \\ every_case_tac \\ fs []
 QED
 
 Theorem make_init_any_stack_limit:
-   LENGTH ((make_init_any gen_gc max_heap (bitmaps:'a word list) data_sp coracle jump off k code s).stack) *
+   LENGTH ((make_init_any gen_gc s_offs max_heap (bitmaps:'a word list) data_sp coracle jump off k code s).stack) *
       (dimindex (:'a) DIV 8) < dimword (:'a)
 Proof
   fs [make_init_any_def]
@@ -3435,7 +3436,7 @@ Proof
 QED
 
 Theorem make_init_any_compile_oracle:
-   (make_init_any ggc max_heap bitmaps data_sp coracle jump off k code s).compile_oracle = coracle
+   (make_init_any ggc s_offs max_heap bitmaps data_sp coracle jump off k code s).compile_oracle = coracle
 Proof
   fs [make_init_any_def,make_init_opt_def,init_reduce_def]
   \\ every_case_tac \\ fs []
@@ -3573,7 +3574,7 @@ Theorem stack_remove_stack_asm_name:
   reg_name (k+1) c ∧
   reg_name k c ⇒
   EVERY (λ(n,p). stack_asm_name c p)
-  (compile jump c.addr_offset gen_gc max_heap k start prog)
+  (compile jump c.addr_offset s_offfs gen_gc max_heap k start prog)
 Proof
   rw[compile_def]
   >-
@@ -3599,7 +3600,7 @@ Proof
 QED
 
 Theorem stack_remove_call_args:
-   compile jump off gen_gc n k pos p = p' /\
+   compile jump off s_offs gen_gc n k pos p = p' /\
     EVERY (λp. call_args p 1 2 3 4 0) (MAP SND p) ==>
     EVERY (λp. call_args p 1 2 3 4 0) (MAP SND p')
 Proof

@@ -152,6 +152,7 @@ Proof
     >- (fs[jump_exc_def] >> EVERY_CASE_TAC >> rw[] >> fs[])
     >- (fs[no_install_def] >> EVERY_CASE_TAC >> rw[] >> fs[])
     >- (EVERY_CASE_TAC >> fs[set_var_def] >> rw[] >> fs[])
+    >- (EVERY_CASE_TAC >> fs[set_var_def] >> rw[] >> fs[])
     >- (fs[no_install_def])
     >- (EVERY_CASE_TAC >> rw[] >> fs[])
     >- (EVERY_CASE_TAC >> rw[] >> fs[])
@@ -518,6 +519,7 @@ val word_state_rel_def = Define `
         s.memory         = t.memory ∧
         s.mdomain        = t.mdomain ∧
         s.permute        = t.permute ∧
+        s.rodata         = t.rodata ∧
         s.compile        = t.compile ∧
         s.compile_oracle = t.compile_oracle ∧
         s.code_buffer    = t.code_buffer ∧
@@ -1461,6 +1463,11 @@ Proof
     >- ( (* Install *)
         fs[no_install_def]
         )
+    >- (* StaticRead *)
+      (simp[wordSemTheory.evaluate_def] >> fs[get_var_def] >> every_case_tac >> fs[] >>
+      rw[dest_result_loc_def,set_var_def,word_state_rel_def]>>fs[domain_find_loc_state]>>
+      qspecl_then[`r`,`Word (EL (w2n c) s.rodata)`,`s.locals`] mp_tac get_locals_insert>>
+      rw[dest_word_loc_def]>>drule_all SUBSET_TRANS>>rw[])
     >- ( (* LocValue *)
         simp[wordSemTheory.evaluate_def] >> fs[find_word_ref_def] >>
         imp_res_tac code_rel_def >>

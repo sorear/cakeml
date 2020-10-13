@@ -98,6 +98,7 @@ val _ = Datatype `
      ; stack_size : num num_map (* stack frame size of function, unbounded if unmapped *)
      ; memory  : 'a word -> 'a word_loc
      ; mdomain : ('a word) set
+     ; rodata  : 'a word list
      ; permute : num -> num -> num (* sequence of bijective mappings *)
      ; compile : 'c -> (num # num # 'a wordLang$prog) list -> (word8 list # 'a word list # 'c) option
      ; compile_oracle : num -> 'c # (num # num # 'a wordLang$prog) list
@@ -694,7 +695,7 @@ val evaluate_def = tDefine "evaluate" `
      | NONE => (SOME Error, s)
      | SOME x => (NONE, set_var v x s)) /\
   (evaluate (Set v exp,s) =
-     if v = Handler ∨ v = BitmapBase then (SOME Error,s)
+     if v = Handler ∨ v = BitmapBase ∨ v = StaticOffset then (SOME Error,s)
      else
      case word_exp s exp of
      | NONE => (SOME Error, s)
@@ -744,6 +745,10 @@ val evaluate_def = tDefine "evaluate" `
      if l1 ∈ domain s.code then
        (NONE,set_var r (Loc l1 0) s)
      else (SOME Error,s)) /\
+  (evaluate (StaticRead r n,s) =
+    case get_var n s of
+    | SOME (Word w) => if w2n w < LENGTH s.rodata then (NONE,set_var r (Word (EL (w2n w) s.rodata)) s) else (SOME Error,s)
+    | _ => (SOME Error,s)) /\
   (evaluate (Install ptr len dptr dlen names,s) =
     case cut_env names s.locals of
     | NONE => (SOME Error,s)

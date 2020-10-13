@@ -574,6 +574,7 @@ Proof
   >- (rename [‘Tick’] \\ tac)
   >- (rename [‘OpCurrHeap’] \\ tac)
   >- (rename [‘LocValue’] \\ tac \\ fs[domain_lookup] \\ metis_tac[])
+  >- (rename [‘StaticRead’] \\ tac)
   >- (* Install *)
     (qexists_tac`st.permute`>>fs[rm_perm]>>
     ntac 3 (last_x_assum kall_tac)>>

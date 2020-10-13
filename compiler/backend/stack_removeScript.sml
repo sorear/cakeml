@@ -22,6 +22,7 @@ val store_list_def = Define `
   store_list = [NextFree; EndOfHeap; HeapLength; OtherHeap; TriggerGC;
                 AllocSize; Handler; Globals; ProgStart; BitmapBase; GenStart;
                 CodeBuffer; CodeBufferEnd; BitmapBuffer; BitmapBufferEnd;
+                StaticOffset;
                 Temp 00w; Temp 01w; Temp 02w; Temp 03w; Temp 04w;
                 Temp 05w; Temp 06w; Temp 07w; Temp 08w; Temp 09w;
                 Temp 10w; Temp 11w; Temp 12w; Temp 13w; Temp 14w;
@@ -194,7 +195,7 @@ val init_memory_def = Define `
               store_list_code (k+1) 0 xs]`;
 
 val store_init_def = Define `
-  store_init gen_gc (k:num) =
+  store_init static_offset gen_gc (k:num) =
     (K (INL 0w)) =++
       [(CurrHeap,INR (k+2));
        (NextFree,INR (k+2));
@@ -205,6 +206,7 @@ val store_init_def = Define `
        (BitmapBase,INR 3);
        (BitmapBuffer,INR 4);
        (BitmapBufferEnd,INR 6);
+       (StaticOffset,INL static_offset);
        (CodeBuffer,INR 7);
        (CodeBufferEnd,INR 1)]`
 
@@ -215,7 +217,7 @@ val store_init_def = Define `
     reg 4: one past last address of stack *)
 
 val init_code_def = Define `
-  init_code gen_gc max_heap k =
+  init_code static_offset gen_gc max_heap k =
     let max_heap = (if max_heap * w2n (bytes_in_word:'a word) < dimword (:'a)
                     then n2w max_heap * bytes_in_word
                     else 0w-1w) in
@@ -265,12 +267,12 @@ val init_code_def = Define `
                 load_inst 7 0;
                 add_bytes_in_word_inst 0;
                 load_inst 1 0;
-                init_memory k (MAP (store_init gen_gc k) (REVERSE store_list));
+                init_memory k (MAP (store_init static_offset gen_gc k) (REVERSE store_list));
                 LocValue 0 1 0]`
 
 val init_stubs_def = Define `
-  init_stubs gen_gc max_heap k start =
-    [(0n,Seq (init_code gen_gc max_heap k) (Call NONE (INL start) NONE));
+  init_stubs s_offs gen_gc max_heap k start =
+    [(0n,Seq (init_code s_offs gen_gc max_heap k) (Call NONE (INL start) NONE));
      (1n,halt_inst 0w);
      (2n,halt_inst 2w)]`
 
@@ -281,7 +283,7 @@ val stub_names_def = Define`
     (2n,mlstring$strlit "_Halt2")]`
 
 Theorem check_init_stubs_length:
-   LENGTH (init_stubs gen_gc max_heap k start) + 1 (* gc *) =
+   LENGTH (init_stubs s_offs gen_gc max_heap k start) + 1 (* gc *) =
    stack_num_stubs
 Proof
   EVAL_TAC
@@ -290,8 +292,8 @@ QED
 (* -- full compiler -- *)
 
 val compile_def = Define `
-  compile jump off gen_gc max_heap k start prog =
-    init_stubs gen_gc max_heap k start ++
+  compile jump off s_offs gen_gc max_heap k start prog =
+    init_stubs s_offs gen_gc max_heap k start ++
     MAP (prog_comp jump off k) prog`;
 
 val _ = export_theory();

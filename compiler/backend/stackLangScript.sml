@@ -19,7 +19,7 @@ val _ = Datatype `
     NextFree | EndOfHeap | TriggerGC | HeapLength | ProgStart | BitmapBase |
     CurrHeap | OtherHeap | AllocSize | Globals | Handler | GenStart |
     CodeBuffer | CodeBufferEnd | BitmapBuffer | BitmapBufferEnd |
-    Temp (5 word)`
+    StaticOffset | Temp (5 word)`
 
 val _ = Datatype `
   prog = Skip

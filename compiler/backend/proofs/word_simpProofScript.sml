@@ -1054,6 +1054,10 @@ Proof
   (fs [const_fp_loop_def] \\ rw [evaluate_def] \\
   metis_tac [cs_delete_if_set])
 
+  >- (** StaticRead **)
+  (fs[const_fp_loop_def,evaluate_def,get_var_def,set_var_def,lookup_delete]>>
+  rw[]>>every_case_tac>>rw[lookup_insert])
+
   >- (** Alloc **)
   (fs [const_fp_loop_def] \\ rw [evaluate_def, alloc_def] \\ every_case_tac \\ fs [] \\
   `gc_fun_const_ok (push_env x (NONE:(num # 'a prog # num # num) option) (set_store AllocSize (Word c) s)).gc_fun`

@@ -69,12 +69,12 @@ val compile_tap_def = Define`
       stack_remove$stub_names ())) names in
     let td = tap_word c.tap_conf (p,names) td in
     let _ = empty_ffi (strlit "finished: data_to_word") in
-    let (c',fs,p) = word_to_stack$compile c.lab_conf.asm_conf p in
+    let (c',fs,p) = word_to_stack$compile c.lab_conf.asm_conf [] p in
     let td = tap_stack c.tap_conf (p,names) td in
     let c = c with word_conf := c' in
     let _ = empty_ffi (strlit "finished: word_to_stack") in
     let p = stack_to_lab$compile
-      c.stack_conf c.data_conf (2 * max_heap_limit (:'a) c.data_conf - 1)
+      c.stack_conf c.word_conf c.data_conf (2 * max_heap_limit (:'a) c.data_conf - 1)
       (c.lab_conf.asm_conf.reg_count - (LENGTH c.lab_conf.asm_conf.avoid_regs +3))
       (c.lab_conf.asm_conf.addr_offset) p in
     let td = tap_lab c.tap_conf (p,names) td in
@@ -133,7 +133,7 @@ val to_word_def = Define`
 val to_stack_def = Define`
   to_stack c p =
   let (c,p,names) = to_word c p in
-  let (c',fs,p) = word_to_stack$compile c.lab_conf.asm_conf p in
+  let (c',fs,p) = word_to_stack$compile c.lab_conf.asm_conf [] p in
   let c = c with word_conf := c' in
   (c,p,names)`;
 
@@ -141,7 +141,7 @@ val to_lab_def = Define`
   to_lab c p =
   let (c,p,names) = to_stack c p in
   let p = stack_to_lab$compile
-    c.stack_conf c.data_conf (2 * max_heap_limit (:'a) c.data_conf - 1)
+    c.stack_conf c.word_conf c.data_conf (2 * max_heap_limit (:'a) c.data_conf - 1)
     (c.lab_conf.asm_conf.reg_count - (LENGTH c.lab_conf.asm_conf.avoid_regs +3))
     (c.lab_conf.asm_conf.addr_offset) p in
   (c,p:'a prog,names)`;
@@ -182,14 +182,14 @@ val from_lab_def = Define`
 val from_stack_def = Define`
   from_stack c names p =
   let p = stack_to_lab$compile
-    c.stack_conf c.data_conf (2 * max_heap_limit (:'a) c.data_conf - 1)
+    c.stack_conf c.word_conf c.data_conf (2 * max_heap_limit (:'a) c.data_conf - 1)
     (c.lab_conf.asm_conf.reg_count - (LENGTH c.lab_conf.asm_conf.avoid_regs +3))
     (c.lab_conf.asm_conf.addr_offset) p in
   from_lab c names (p:'a prog)`;
 
 val from_word_def = Define`
   from_word c names p =
-  let (c',fs,p) = word_to_stack$compile c.lab_conf.asm_conf p in
+  let (c',fs,p) = word_to_stack$compile c.lab_conf.asm_conf [] p in
   let c = c with word_conf := c' in
   from_stack c names p`;
 

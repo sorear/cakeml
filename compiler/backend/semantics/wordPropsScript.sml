@@ -88,6 +88,7 @@ Theorem set_store_const[simp]:
    (set_store x y z).be = z.be ∧
    (set_store x y z).data_buffer = z.data_buffer ∧
    (set_store x y z).code_buffer = z.code_buffer ∧
+   (set_store x y z).rodata = z.rodata ∧
    (set_store x y z).code = z.code ∧
    (set_store x y z).locals_size = z.locals_size ∧
    (set_store x y z).stack_limit = z.stack_limit ∧
@@ -234,6 +235,7 @@ Theorem gc_const:
    y.be = x.be ∧
    y.code_buffer = x.code_buffer ∧
    y.data_buffer = x.data_buffer ∧
+   y.rodata = x.rodata ∧
    y.compile = x.compile ∧
    y.compile_oracle = x.compile_oracle ∧
    y.locals_size = x.locals_size ∧
@@ -336,6 +338,8 @@ Theorem set_var_const[simp]:
    (set_var x y z).compile_oracle = z.compile_oracle ∧
    (set_var x y z).code_buffer = z.code_buffer ∧
    (set_var x y z).data_buffer = z.data_buffer ∧
+   (set_var x y z).rodata = z.rodata ∧
+   (set_var x y z).fp_regs = z.fp_regs ∧
    (set_var x y z).stack = z.stack ∧
    (set_var x y z).locals_size = z.locals_size ∧
    (set_var x y z).stack_limit = z.stack_limit ∧
@@ -376,6 +380,7 @@ Theorem set_vars_const[simp]:
    (set_vars x y z).code = z.code ∧
    (set_vars x y z).code_buffer = z.code_buffer ∧
    (set_vars x y z).data_buffer = z.data_buffer ∧
+   (set_vars x y z).rodata = z.rodata ∧
    (set_vars x y z).compile = z.compile ∧
    (set_vars x y z).be = z.be ∧
    (set_vars x y z).ffi = z.ffi ∧
@@ -693,6 +698,7 @@ Proof
       strip_tac>>full_simp_tac(srw_ss())[])
   >- tac
   >- (tac>>imp_res_tac jump_exc_const>>full_simp_tac(srw_ss())[])
+  >- tac
   >- tac
   >-
      (tac>>fs[]>>pairarg_tac>>fs[]>>
@@ -1602,6 +1608,12 @@ Proof
   >- (*LocValue*) (
     fs[evaluate_def,set_var_def,state_component_equality,s_key_eq_refl]
     \\ rw[s_key_eq_refl,state_component_equality] )
+  >- (*StaticRead*)
+    (fs[evaluate_def]>>every_case_tac>>
+    fs[set_var_def,s_key_eq_refl]>>
+    rpt strip_tac>>
+    HINT_EXISTS_TAC>>
+    full_simp_tac(srw_ss())[GEN_ALL(SYM(SPEC_ALL word_exp_stack_swap)),s_key_eq_refl])
   >- (* Install *) (
     fs[evaluate_def]>>
     TOP_CASE_TAC>>fs[]>>
@@ -2251,6 +2263,8 @@ Proof
       full_simp_tac(srw_ss())[LET_THM])
   >- (*LocValue*)
     (qexists_tac`perm`>>rw[]>>fs[set_var_def,state_component_equality])
+  >- (*StaticRead*)
+    (qexists_tac`perm`>>fs[case_eq_thms,UNCURRY])
   >- (*Install*)
     (qexists_tac`perm`>>fs[case_eq_thms,UNCURRY])
   >- (* CBW *)
@@ -2780,6 +2794,9 @@ Proof
     (rw[]>>fs[set_var_def,state_component_equality]>>rveq>>fs[]>>
     qpat_x_assum`A=rst.locals` sym_sub_tac>>
     metis_tac[locals_rel_set_var])
+  >-
+    (fs[case_eq_thms,every_var_def]>>rw[]>>
+    imp_res_tac locals_rel_get_var>>fs[state_component_equality,set_var_def,locals_rel_set_var])
   >- (* Install *)
     (fs[case_eq_thms,UNCURRY,every_var_def]>>rw[]>>
     imp_res_tac locals_rel_cut_env>>
@@ -2810,11 +2827,12 @@ QED
 val gc_fun_ok_def = Define `
   gc_fun_ok (f:'a gc_fun_type) =
     !wl m d s wl1 m1 s1.
-      Handler IN FDOM s /\
-      (f (wl,m,d,s \\ Handler) = SOME (wl1,m1,s1)) ==>
+      Handler IN FDOM s /\ StaticOffset IN FDOM s ∧
+      (f (wl,m,d,s \\ Handler \\ StaticOffset) = SOME (wl1,m1,s1)) ==>
       (LENGTH wl = LENGTH wl1) /\
-      ~(Handler IN FDOM s1) /\
-      (f (wl,m,d,s) = SOME (wl1,m1,s1 |+ (Handler,s ' Handler)))`
+      ~(Handler IN FDOM s1) /\ ~(StaticOffset IN FDOM s1) ∧
+      (f (wl,m,d,s) = SOME (wl1,m1,s1 |+ (Handler,s ' Handler) |+
+        (StaticOffset,s ' StaticOffset)))`
 
 (* wordLang syntactic things, TODO: not updated for install,cbw,dbw *)
 (* No expressions occur except in Set, where it must be a Var expr *)
@@ -3418,6 +3436,7 @@ Proof
    disch_then drule >> strip_tac >> rfs [] >>
    fs[stack_size_eq2, stack_size_frame_def])
   >- (every_case_tac >> fs [])
+  >- (every_case_tac >> fs [] >> rveq >> fs [state_fn_updates])
   >- (
     every_case_tac >> fs [] >> pairarg_tac >> fs [] >> every_case_tac >> fs [] >>
     rveq >> fs [state_fn_updates])
@@ -3989,6 +4008,10 @@ Proof
            CaseEq"stack_frame",pair_case_eq]
     \\ rw [] \\ rveq \\ fs [])
   THEN1 (* LocValue *)
+   (fs [wordSemTheory.evaluate_def] \\ rveq
+    \\ fs [CaseEq"option",CaseEq"word_loc",bool_case_eq]
+    \\ rveq \\ fs [flush_state_def,set_var_def])
+  THEN1 (* StaticRead *)
    (fs [wordSemTheory.evaluate_def] \\ rveq
     \\ fs [CaseEq"option",CaseEq"word_loc",bool_case_eq]
     \\ rveq \\ fs [flush_state_def,set_var_def])

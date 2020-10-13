@@ -349,6 +349,7 @@ val const_fp_loop_def = Define `
            (Call ret dest args handler, LN))) /\
   (const_fp_loop (FFI x0 x1 x2 x3 x4 names) cs = (FFI x0 x1 x2 x3 x4 names, inter cs names)) /\
   (const_fp_loop (LocValue v x3) cs = (LocValue v x3, delete v cs)) /\
+  (const_fp_loop (StaticRead x1 x2) cs = (StaticRead x1 x2, delete x1 cs)) /\
   (const_fp_loop (Alloc n names) cs = (Alloc n names, filter_v is_gc_const (inter cs names))) /\
   (const_fp_loop (Install r1 r2 r3 r4 names) cs = (Install r1 r2 r3 r4 names, delete r1 (filter_v is_gc_const (inter cs names)))) /\
   (const_fp_loop p cs = (p, cs))`;
@@ -391,6 +392,7 @@ Theorem const_fp_loop_pmatch:
            (Call ret dest args handler, LN)))
   | (FFI x0 x1 x2 x3 x4 names) => (FFI x0 x1 x2 x3 x4 names, inter cs names)
   | (LocValue v x3) => (LocValue v x3, delete v cs)
+  | (StaticRead x1 x2) => (StaticRead x1 x2, delete x1 cs)
   | (Alloc n names) => (Alloc n names, filter_v is_gc_const (inter cs names))
   | (Install r1 r2 r3 r4 names) => (Install r1 r2 r3 r4 names, delete r1 (filter_v is_gc_const (inter cs names)))
   | p => (p, cs)

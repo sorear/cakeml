@@ -379,6 +379,10 @@ Proof
    (fs [wordSemTheory.evaluate_def] \\ rveq
     \\ fs [CaseEq"option",CaseEq"word_loc",bool_case_eq]
     \\ rveq \\ fs [flush_state_def,option_le_X_MAX_X])
+  THEN1 (* StaticRead *)
+   (fs [wordSemTheory.evaluate_def] \\ rveq
+    \\ fs [CaseEq"option",CaseEq"word_loc",bool_case_eq]
+    \\ rveq \\ fs [flush_state_def,option_le_X_MAX_X])
   THEN1 (* Install *)
    (fs [call_graph_def,max_depth_def,OPTION_MAP2_DEF])
   THEN1 (* CodeBufferWrite *)

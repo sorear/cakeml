@@ -12,6 +12,7 @@ open preamble asmTheory wordLangTheory stackLangTheory parmoveTheory
 val _ = new_theory "word_to_stack";
 
 val _ = Datatype `config = <| bitmaps : 'a word list ;
+                              static_offset : 'a word ;
                               stack_frame_size : num spt |>`;
 
 (* -- *)
@@ -244,6 +245,14 @@ val PopHandler_def = Define`
   (Seq (StackFree 3)
   prog))`
 
+val static_read_def = Define‘
+  static_read r1 r2 (k,f,f') =
+    Seq (Get (k+1) StaticOffset)
+        (Seq (Inst (Arith (Binop Add (k+1) (k+1) (Reg r2))))
+             (BitmapLoad r1 (k+1)))’
+
+
+
 val comp_def = Define `
   (comp (Skip:'a wordLang$prog) bs kf = (Skip:'a stackLang$prog,bs)) /\
   (comp (Move _ xs) bs kf = (wMove xs kf,bs)) /\
@@ -301,6 +310,9 @@ val comp_def = Define `
      let (q1,bs) = wLive live bs kf in
        (Seq q1 (Alloc 1),bs)) /\
   (comp (LocValue r l1) bs kf = (wRegWrite1 (λr. LocValue r l1 0) r kf,bs)) /\
+  (comp (StaticRead r1 r2) bs kf =
+    let (l2,r2) = wReg1 r2 kf in
+      (wStackLoad l2 (wRegWrite1 (\r1. static_read r1 r2 kf) r1 kf),bs)) /\
   (comp (Install r1 r2 r3 r4 live) bs kf =
     let (l3,r3) = wReg1 r3 kf in
     let (l4,r4) = wReg2 r4 kf in
@@ -346,11 +358,12 @@ val compile_word_to_stack_def = Define `
        ((i,prog)::progs,f::fs,bitmaps))`
 
 val compile_def = Define `
-  compile asm_conf progs =
+  compile asm_conf static_data progs =
     let k = asm_conf.reg_count - (5+LENGTH asm_conf.avoid_regs) in
     let (progs,fs,bitmaps) = compile_word_to_stack k progs [4w] in
     let sfs = fromAList (MAP (λ((i,_),n). (i,n)) (ZIP (progs,fs))) in
-      (<| bitmaps := bitmaps;
+      (<| bitmaps := bitmaps ++ static_data;
+          static_offset := n2w (LENGTH bitmaps);
           stack_frame_size := sfs |>, 0::fs, (raise_stub_location,raise_stub k) :: progs)`
 
 val stub_names_def = Define`

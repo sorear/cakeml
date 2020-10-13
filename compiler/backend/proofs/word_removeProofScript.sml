@@ -32,6 +32,7 @@ Theorem compile_state_const[simp]:
    (compile_state clk c s).store = s.store ∧
    (compile_state clk c s).fp_regs = s.fp_regs ∧
    (compile_state clk c s).memory = s.memory ∧
+   (compile_state clk c s).rodata = s.rodata ∧
    (compile_state clk c s).mdomain = s.mdomain ∧
    (compile_state clk c s).be = s.be ∧
    (compile_state clk c s).gc_fun = s.gc_fun ∧

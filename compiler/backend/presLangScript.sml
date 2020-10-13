@@ -621,6 +621,7 @@ val store_name_to_display_def = Define `
     | CodeBufferEnd => empty_item «CodeBufferEnd»
     | BitmapBuffer => empty_item «BitmapBuffer»
     | BitmapBufferEnd => empty_item «BitmapBufferEnd»
+    | StaticOffset => empty_item «StaticOffset»
     | Temp n => item_with_num «Temp» (w2n n)`;
 
 val stack_prog_to_display_def = Define`
@@ -777,6 +778,8 @@ val word_prog_to_display_def = tDefine "word_prog_to_display" `
   (word_prog_to_display Tick = empty_item (strlit "Tick")) /\
   (word_prog_to_display (LocValue n1 n2) =
     item_with_nums (strlit "LocValue") [n1; n2]) /\
+  (word_prog_to_display (StaticRead n1 n2) =
+    item_with_nums (strlit "StaticRead") [n1; n2]) /\
   (word_prog_to_display (Install n1 n2 n3 n4 ns) =
     Item NONE (strlit "Install") (MAP num_to_display [n1; n2; n3; n4]
         ++ [num_set_to_display ns])) /\

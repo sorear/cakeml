@@ -2745,24 +2745,24 @@ Overload stack_alloc_compile[local] = ``stack_alloc$compile``
 Overload stack_remove_compile[local] = ``stack_remove$compile``
 
 val full_make_init_def = Define`
-  full_make_init stack_conf data_conf max_heap sp offset bitmaps code s4 save_regs data_sp coracle =
+  full_make_init stack_conf word_conf data_conf max_heap sp offset bitmaps code s4 save_regs data_sp coracle =
   let ggc = is_gen_gc data_conf.gc_kind in
   let jump = stack_conf.jump in
   let code1 = stack_alloc$compile data_conf (stack_rawcall$compile code) in
-  let code2 = compile jump offset ggc max_heap sp InitGlobals_location code1 in
+  let code2 = compile jump offset word_conf.static_offset ggc max_heap sp InitGlobals_location code1 in
   let code3 = fromAList (compile stack_conf.reg_names code2) in
   let coracle1 = (I ## MAP prog_comp ## I) o coracle in
   let coracle2 = (I ## MAP (prog_comp jump offset sp) ## I) o coracle1 in
   let coracle3 = (I ## compile stack_conf.reg_names ## I) o coracle2 in
   let s3 = make_init code3 coracle3 (MAP (find_name stack_conf.reg_names) [2;3;4]) save_regs s4 in
   let s2 = make_init stack_conf.reg_names (fromAList code2) coracle2 s3 in
-  let s1 = make_init_any ggc max_heap bitmaps data_sp coracle1 jump offset sp (fromAList code1) s2 in
+  let s1 = make_init_any ggc word_conf.static_offset max_heap bitmaps data_sp coracle1 jump offset sp (fromAList code1) s2 in
     (make_init data_conf (fromAList code) coracle s1,
-     make_init_opt ggc max_heap bitmaps data_sp coracle1 jump offset sp (fromAList code1) s2)`;
+     make_init_opt ggc word_conf.static_offset max_heap bitmaps data_sp coracle1 jump offset sp (fromAList code1) s2)`;
 
 Theorem full_make_init_buffer:
-    (FST(full_make_init a b c d e f g h i j k)).code_buffer.buffer = [] ∧
-  (FST(full_make_init a b c d e f g h i j k)).data_buffer.buffer = []
+    (FST(full_make_init a b c d e f g h i j k l)).code_buffer.buffer = [] ∧
+  (FST(full_make_init a b c d e f g h i j k l)).data_buffer.buffer = []
 Proof
   fs [full_make_init_def,stack_allocProofTheory.make_init_def,
      stack_removeProofTheory.make_init_any_def] >>
@@ -2774,14 +2774,14 @@ Proof
 QED
 
 Theorem full_make_init_ffi:
-    (FST(full_make_init a b c d e f g h i j k)).ffi = h.ffi
+    (FST(full_make_init a b c d e f g h i j k l)).ffi = i.ffi
 Proof
   fs [full_make_init_def,stack_allocProofTheory.make_init_def] >>
   fs [stack_removeProofTheory.make_init_any_ffi] \\ EVAL_TAC
 QED
 
 Theorem full_make_init_compile:
-   (FST(full_make_init a b c d e f g h i j k)).compile =
+   (FST(full_make_init a wc b c d e f g h i j k)).compile =
    (λc. (λp. h.compile c (MAP prog_to_section (MAP (prog_comp a.reg_names) (MAP (prog_comp a.jump e d) p)))) o MAP prog_comp)
 Proof
   fs [full_make_init_def,stack_allocProofTheory.make_init_def]
@@ -2821,7 +2821,7 @@ val memory_assumption_def = Define`
 val halt_assum_lemma = Q.prove(
   `halt_assum (:'ffi#'c)
      (fromAList (stack_names$compile f
-       (compile jump off gen max_heap k l code)))`,
+       (compile jump off static_offs gen max_heap k l code)))`,
   fs [halt_assum_def] \\ rw []
   \\ fs [stackSemTheory.evaluate_def,
          stackSemTheory.find_code_def]
@@ -2883,7 +2883,7 @@ Proof
 QED
 
 val MAP_FST_compile_compile = Q.prove(
-  `MAP FST (compile jump off gen max_heap k InitGlobals_location
+  `MAP FST (compile jump off s_offs gen max_heap k InitGlobals_location
               (stack_alloc$compile c
                  (stack_rawcall$compile code))) =
     0::1::2::gc_stub_location::MAP FST code`,
@@ -2977,7 +2977,7 @@ Theorem stack_to_lab_compile_lab_pres:
     EVERY (λ(l1,l2).l1 = n ∧ l2 ≠ 0 ∧ l2 ≠ 1) labs ∧
     ALL_DISTINCT labs) prog ∧
   ALL_DISTINCT (MAP FST prog) ⇒
-  labels_ok (compile c c2 c3 sp offset prog)
+  labels_ok (compile c c2 so c3 sp offset prog)
 Proof
   rw[labels_ok_def,stack_to_labTheory.compile_def]
   >-
@@ -3052,10 +3052,10 @@ Definition contain_def:
 End
 
 Theorem full_make_init_semantics:
-   full_make_init stack_conf data_conf max_heap sp offset
+   full_make_init stack_conf word_conf data_conf max_heap sp offset
     (bitmaps:'a word list) code t save_regs data_sp coracle = (s,opt) ∧
    good_dimindex(:'a) ∧
-   t.code = stack_to_lab$compile stack_conf data_conf max_heap sp offset code ∧
+   t.code = stack_to_lab$compile stack_conf word_conf data_conf max_heap sp offset code ∧
    t.compile_oracle = (λn.
      let (c,p,b) = coracle n in
        (c,compile_no_stubs stack_conf.reg_names stack_conf.jump offset sp p)) ∧
@@ -3212,7 +3212,7 @@ Proof
            prog_to_section_def] \\
       pairarg_tac \\ fs[Once loc_to_pc_def] )
     \\ rfs[])
-  \\ `discharge_these stack_conf.jump offset ggc max_heap sp InitGlobals_location coracle1 code1 s2`
+  \\ `discharge_these stack_conf.jump offset word_conf.static_offset ggc max_heap sp InitGlobals_location coracle1 code1 s2`
   by (
     simp[discharge_these_def] \\ fs[good_code_def]
     \\ simp[Abbr`s2`]
@@ -3376,7 +3376,7 @@ Theorem stack_to_lab_compile_all_enc_ok:
   (∀s. addr_offset_ok c (store_offset s)) ∧ reg_name 10 c ∧
   reg_name (sp + 2) c ∧ reg_name (sp + 1) c ∧ reg_name sp c  ∧
   conf_ok (:'a) c2 ⇒
-  all_enc_ok_pre c (compile c1 c2 c3 sp c.addr_offset prog)
+  all_enc_ok_pre c (compile c1 wc c2 c3 sp c.addr_offset prog)
 Proof
   rw[stack_to_labTheory.compile_def]>>
   match_mp_tac compile_all_enc_ok_pre>>fs[]>>
@@ -3388,10 +3388,10 @@ QED
 
 Theorem IMP_init_store_ok:
    max_heap = 2 * max_heap_limit (:'a) c1 -1 /\
-  (fmis,xxx) = full_make_init stack_conf c1 max_heap sp offset (bitmaps:'a word list) code s save_regs data_sp coracle
+  (fmis,xxx) = full_make_init stack_conf word_conf c1 max_heap sp offset (bitmaps:'a word list) code s save_regs data_sp coracle
   ==>
     init_store_ok c1
-      (fmis.store \\ Handler)
+      (fmis.store \\ Handler \\ StaticOffset)
        fmis.memory
        fmis.mdomain
       fmis.code_buffer
@@ -3423,6 +3423,7 @@ QED
 Theorem IMP_init_state_ok:
      4 < kkk /\
     (bitmaps:'a word list) = 4w::t ∧
+    static_data ≼ DROP (w2n wc.static_offset) bitmaps ∧
     good_dimindex (:α) /\
   (∀n.
     (λ((bm0,cfg),progs).
@@ -3438,9 +3439,9 @@ Theorem IMP_init_state_ok:
         (compile_word_to_stack
            kkk progs
            bm0)) (word_oracle n)) ∧
-    (full_make_init sc dc max_heap stk stoff bitmaps p6 lab_st save_regs data_sp stack_oracle = (fmis,SOME xxx))
+    (full_make_init sc wc dc max_heap stk stoff bitmaps p6 lab_st save_regs data_sp stack_oracle = (fmis,SOME xxx))
     ==>
-    init_state_ok kkk fmis word_oracle
+    init_state_ok kkk fmis static_data word_oracle
 Proof
   fs [full_make_init_def,stack_allocProofTheory.make_init_def,
       stack_removeProofTheory.make_init_any_def] \\ strip_tac
@@ -3452,7 +3453,7 @@ Proof
   \\ rewrite_tac [stack_removeProofTheory.make_init_opt_def]
   \\ qpat_abbrev_tac `read_ptrs = read_pointers _`
   \\ disch_then kall_tac
-  \\ `init_prop (is_gen_gc dc.gc_kind) max_heap data_sp
+  \\ `init_prop (is_gen_gc dc.gc_kind) wc.static_offset max_heap data_sp
         (get_stack_heap_limit max_heap read_ptrs) x /\
       x.bitmaps = 4w::t` by
         (fs [stack_removeProofTheory.make_init_opt_def,
@@ -3471,10 +3472,10 @@ Proof
 QED
 
 Theorem full_make_init_has_fp_ops[simp]:
-  full_make_init stack_conf
+  full_make_init stack_conf wconf
       (dconf with <| has_fp_ops := b1; has_fp_tern := b2 |>)
       mheap sp offset bitmaps code s save_regs dsp cor =
-    full_make_init stack_conf dconf
+    full_make_init stack_conf wconf dconf
       mheap sp offset bitmaps code s save_regs dsp cor
 Proof
   rewrite_tac [full_make_init_def] \\ fs []
@@ -3820,7 +3821,7 @@ val get_code_labels_comp = Q.prove(
     fs[stack_removeTheory.max_stack_alloc_def]));
 
 val init_stubs_labels = Q.prove(`
-  EVERY (λp. get_code_labels p SUBSET (set [(1n,0n);(start,0n)])) (MAP SND (init_stubs ggc mh k start))`,
+  EVERY (λp. get_code_labels p SUBSET (set [(1n,0n);(start,0n)])) (MAP SND (init_stubs soffs ggc mh k start))`,
   rpt(EVAL_TAC>>rw[]>>fs[]));
 
 (* ---- stack_names  ----*)
@@ -3938,14 +3939,14 @@ val stack_remove_stack_get_handler_labels_comp = Q.prove(
     fs[stack_removeTheory.max_stack_alloc_def]));
 
 val stack_remove_init_code_labels = Q.prove(`
-  x ∈ get_code_labels (init_code ggc mh sp) ⇒ x = (1n,0n)`,
+  x ∈ get_code_labels (init_code soffs ggc mh sp) ⇒ x = (1n,0n)`,
   rpt(EVAL_TAC>>rw[]>>fs[]));
 
 Theorem stack_remove_stack_good_code_labels:
   ∀prog.
   MEM loc (MAP FST prog) ∧
   stack_good_code_labels prog elabs ⇒
-  stack_good_code_labels (stack_remove$compile jump off ggc mh sp loc prog) elabs
+  stack_good_code_labels (stack_remove$compile jump off s_offs ggc mh sp loc prog) elabs
 Proof
   rw[]>>
   simp[stack_removeTheory.compile_def]>>
@@ -4137,7 +4138,7 @@ QED
 
 (* stack_to_lab *)
 Theorem stack_to_lab_stack_good_code_labels:
-  compile stack_conf data_conf max_heap sp offset prog = prog' ∧
+  compile stack_conf word_conf data_conf max_heap sp offset prog = prog' ∧
   MEM InitGlobals_location (MAP FST prog) ∧
   stack_good_code_labels prog elabs ∧
   EVERY sec_labels_ok  prog' ⇒
@@ -4269,7 +4270,7 @@ QED;
 Theorem stack_remove_stack_good_handler_labels:
   ∀prog.
   stack_good_handler_labels prog ⇒
-  stack_good_handler_labels (stack_remove$compile jump off ggc mh sp loc prog)
+  stack_good_handler_labels (stack_remove$compile jump off s_offs ggc mh sp loc prog)
 Proof
   rw[]>>
   simp[stack_removeTheory.compile_def]>>
@@ -4343,7 +4344,7 @@ Proof
 QED
 
 Theorem stack_to_lab_stack_good_handler_labels:
-  compile stack_conf data_conf max_heap sp offset prog = prog' ∧
+  compile stack_conf word_conf data_conf max_heap sp offset prog = prog' ∧
   stack_good_handler_labels prog ∧
   EVERY sec_labels_ok  prog' ⇒
   restrict_nonzero (get_labels prog') ⊆ get_code_labels prog'

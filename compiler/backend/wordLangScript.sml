@@ -48,6 +48,7 @@ val _ = Datatype `
        | Tick
        | OpCurrHeap binop num num (* special case compiled well in stackLang *)
        | LocValue num num        (* assign v1 := Loc v2 0 *)
+       | StaticRead num num      (* v1 := rodata[v2] *)
        | Install num num num num num_set (* code buffer start, length of new code,
                                       data buffer start, length of new data, cut-set *)
        | CodeBufferWrite num num (* code buffer address, byte to write *)
@@ -116,6 +117,7 @@ val every_var_def = Define `
   (every_var P (Assign num exp) = (P num ∧ every_var_exp P exp)) ∧
   (every_var P (Get num store) = P num) ∧
   (every_var P (Store exp num) = (P num ∧ every_var_exp P exp)) ∧
+  (every_var P (StaticRead r1 r2) = (P r1 ∧ P r2)) ∧
   (every_var P (LocValue r _) = P r) ∧
   (every_var P (Install r1 r2 r3 r4 names) = (P r1 ∧ P r2 ∧ P r3 ∧ P r4 ∧ every_name P names)) ∧
   (every_var P (CodeBufferWrite r1 r2) = (P r1 ∧ P r2)) ∧
@@ -251,6 +253,7 @@ val max_var_def = Define `
   (max_var (Return num1 num2) = MAX num1 num2) ∧
   (max_var Tick = 0) ∧
   (max_var (LocValue r l1) = r) ∧
+  (max_var (StaticRead r1 r2) = MAX r1 r2) ∧
   (max_var (Set n exp) = max_var_exp exp) ∧
   (max_var p = 0)`;
 

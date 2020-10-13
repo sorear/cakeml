@@ -126,6 +126,7 @@ val word_state_eq_rel_def = Define`
   t.stack_size = s.stack_size /\
   t.memory = s.memory ∧
   t.mdomain = s.mdomain ∧
+  t.rodata = s.rodata ∧
   t.gc_fun = s.gc_fun ∧
   t.handler = s.handler ∧
   t.clock = s.clock ∧
@@ -425,6 +426,7 @@ Theorem gc_frame:
   st'.compile_oracle = st.compile_oracle ∧
   st'.code_buffer = st.code_buffer ∧
   st'.data_buffer = st.data_buffer ∧
+  st'.rodata = st.rodata ∧
   st'.permute = st.permute ∧
   st'.termdep = st.termdep
 Proof
@@ -1372,6 +1374,14 @@ Proof
       rpt (pop_assum kall_tac)>>
       simp[])>>
     fs[])
+  >- (*StaticRead*)
+    (exists_tac>>Cases_on‘get_var n0 st’>>fs[]>>
+    qspecl_then[`x`,`st`,`n0`,`n0 INSERT (domain live) DELETE n`,`f`,`cst`] (FREEZE_THEN drule) (GEN_ALL strong_locals_rel_get_var)>>fs[]>>rw[]>>
+    every_case_tac>>rw[set_var_def]>>
+    match_mp_tac strong_locals_rel_insert>>
+    CONJ_TAC>-fs[get_writes_def,domain_union,Once INSERT_SING_UNION]>>
+    qspecl_then[`x`,`n0 INSERT (domain live) DELETE n`] match_mp_tac (GEN_ALL strong_locals_rel_subset)>>
+    rw[SUBSET_OF_INSERT])
   >- (* Install *)
     (exists_tac>>
     pairarg_tac>>fs[case_eq_thms]>>
@@ -2219,6 +2229,9 @@ Proof
     fs[numset_list_delete_def,numset_list_insert_def,domain_union,DELETE_DEF,UNION_COMM]>>
     CONJ_TAC>- subset_tac>>
     fs[INJ_IMP_IMAGE_DIFF_single])
+  >- (* StaticRead *)
+    (start_tac>>fs[numset_list_delete_def,numset_list_insert_def,domain_union]>>rw[]>>
+    metis_tac[UNION_COMM,DELETE_DEF,INSERT_SING_UNION,INJ_IMP_IMAGE_DIFF_single,INJ_less,DIFF_SUBSET])
   >- (* Set *)
     (start_tac>>
     fs[numset_list_delete_def,numset_list_insert_def,domain_union,DELETE_DEF,UNION_COMM,get_reads_exp_get_live_exp]>>
@@ -2883,6 +2896,12 @@ Proof
     (IF_CASES_TAC>>
     fs[call_env_def, flush_state_def,dec_clock_def,state_component_equality,strong_locals_rel_def]>>
     rpt var_eq_tac>>fs[] >> metis_tac [])
+  >-
+    (Cases_on‘get_var v40 st’>>fs[]>>
+    imp_res_tac strong_locals_rel_I_get_var>>fs[]>>
+    Cases_on‘x’>>fs[]>>IF_CASES_TAC>>fs[]>>rw[]>>
+    qexists_tac‘insert v39 (Word (EL (w2n c) st.rodata)) t’>>rw[]>>
+    fs[strong_locals_rel_def,lookup_insert]>>rw[])
   >- (* Install *)
     (fs[case_eq_thms]>>pairarg_tac>>
     fs[case_eq_thms]>>rw[]>>
@@ -2894,7 +2913,7 @@ Proof
     rw[]>>
     imp_res_tac strong_locals_rel_I_get_var>>
     rpt(
-      pop_assum(qspecl_then[`t`,`domain v40`] mp_tac)>>
+      pop_assum(qspecl_then[`t`,`domain v42`] mp_tac)>>
       impl_tac>- (fs[strong_locals_rel_def]>>metis_tac[]))>>
     rw[state_component_equality]>>
     fs[strong_locals_rel_def] >>
@@ -4136,6 +4155,8 @@ Proof
     res_tac>>
     imp_res_tac list_next_var_rename_props_2>>
     DECIDE_TAC)>>
+  strip_tac >-
+    exp_tac>>
   strip_tac >-
     exp_tac>>
   strip_tac >-
@@ -5955,6 +5976,8 @@ Proof
     fs[set_var_def,set_store_def,ssa_cc_trans_exp_def]>>
     match_mp_tac ssa_locals_rel_set_var>>
     full_simp_tac(srw_ss())[every_var_def])
+  >-
+    exp_tac
   >-
     exp_tac
   >- (* Install *)

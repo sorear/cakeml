@@ -128,11 +128,12 @@ val _ = Datatype`config =
    |>`;
 
 val compile_def = Define `
- compile stack_conf data_conf max_heap sp offset prog =
+ compile stack_conf word_conf data_conf max_heap sp offset prog =
    let prog = stack_rawcall$compile prog in
    let prog = stack_alloc$compile data_conf prog in
-   let prog = stack_remove$compile stack_conf.jump offset (is_gen_gc data_conf.gc_kind)
-                max_heap sp InitGlobals_location prog in
+   let prog = stack_remove$compile stack_conf.jump offset word_conf.static_offset
+                                   (is_gen_gc data_conf.gc_kind)
+                                   max_heap sp InitGlobals_location prog in
    let prog = stack_names$compile stack_conf.reg_names prog in
      MAP prog_to_section prog`;
 

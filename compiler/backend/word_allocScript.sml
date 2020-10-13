@@ -314,6 +314,10 @@ val ssa_cc_trans_def = Define`
   (ssa_cc_trans (LocValue r l1) ssa na =
     let (r',ssa',na') = next_var_rename r ssa na in
       (LocValue r' l1,ssa',na')) ∧
+  (ssa_cc_trans (StaticRead r1 r2) ssa na =
+    let r2' = option_lookup ssa r2 in
+    let (r1',ssa',na') = next_var_rename r1 ssa na in
+      (StaticRead r1' r2',ssa',na')) ∧
   (ssa_cc_trans (Install ptr len dptr dlen numset) ssa na =
     let ls = MAP FST (toAList numset) in
     let (stack_mov,ssa',na') = list_next_var_rename_move ssa (na+2) ls in
@@ -481,6 +485,8 @@ val apply_colour_def = Define `
     FFI ffi_index (f ptr1) (f len1) (f ptr2) (f len2) (apply_nummap_key f numset)) ∧
   (apply_colour f (LocValue r l1) =
     LocValue (f r) l1) ∧
+  (apply_colour f (StaticRead r1 r2) =
+    StaticRead (f r1) (f r2)) ∧
   (apply_colour f (Alloc num numset) =
     Alloc (f num) (apply_nummap_key f numset)) ∧
   (apply_colour f (Raise num) = Raise (f num)) ∧
@@ -626,6 +632,7 @@ val get_live_def = Define`
   (get_live (Return num1 num2) live = insert num1 () (insert num2 () live)) ∧
   (get_live Tick live = live) ∧
   (get_live (LocValue r l1) live = delete r live) ∧
+  (get_live (StaticRead r1 r2) live = insert r2 () (delete r1 live)) ∧
   (get_live (Set n exp) live = union (get_live_exp exp) live) ∧
   (get_live (OpCurrHeap b n1 n2) live = insert n2 () (delete n1 live)) ∧
   (*Cut-set must be live, args input must be live
@@ -742,6 +749,7 @@ val get_writes_def = Define`
   (get_writes (Assign num exp) = insert num () LN)∧
   (get_writes (Get num store) = insert num () LN) ∧
   (get_writes (LocValue r l1) = insert r () LN) ∧
+  (get_writes (StaticRead r1 r2) = insert r1 () LN) ∧
   (get_writes (Install r1 _ _ _ _) = insert r1 () LN) ∧
   (get_writes (OpCurrHeap b r1 _) = insert r1 () LN) ∧
   (get_writes prog = LN)`
@@ -755,6 +763,7 @@ Theorem get_writes_pmatch:
     | Assign num exp => insert num () LN
     | Get num store => insert num () LN
     | LocValue r l1 => insert r () LN
+    | StaticRead r1 r2 => insert r1 () LN
     | Install r1 _ _ _ _ => insert r1 () LN
     | OpCurrHeap b r1 _ => insert r1 () LN
     | prog => LN
@@ -874,6 +883,7 @@ val get_clash_tree_def = Define`
   (get_clash_tree (Return num1 num2) = Delta [] [num1;num2]) ∧
   (get_clash_tree Tick = Delta [] []) ∧
   (get_clash_tree (LocValue r l1) = Delta [r] []) ∧
+  (get_clash_tree (StaticRead r1 r2) = Delta [r1] [r2]) ∧
   (get_clash_tree (Set n exp) = Delta [] (get_reads_exp exp)) ∧
   (get_clash_tree (OpCurrHeap b dst src) = Delta [dst] [src]) ∧
   (get_clash_tree (Call ret dest args h) =
