@@ -4330,7 +4330,7 @@ Proof
       (fs [ADD_DIV_EQ,DIV_LT_X]
        \\ fs [good_dimindex_def,dimword_def] \\ rfs [])
     \\ `SUC (LENGTH in1) < dimword (:'a)` by
-     (qpat_x_assum `memory_rel c t.be (THE s.tstamps) s.refs s.space t.store t.memory t.mdomain
+     (qpat_x_assum `memory_rel c aa2.be (THE s.tstamps) s.refs s.space t.store t.memory t.mdomain
          ((r1,Word ww)::vars)` assume_tac
       \\ drule (GEN_ALL memory_rel_list_limit)
       \\ rfs [good_dimindex_def] \\ rfs [dimword_def])
@@ -4377,7 +4377,7 @@ Proof
   \\ impl_tac THEN1
    (conj_asm1_tac THEN1 fs [Abbr `s4`]
     \\ reverse conj_tac THEN1
-     (qpat_x_assum `memory_rel c t.be _ s.refs s.space t.store t.memory t.mdomain
+     (qpat_x_assum `memory_rel c _ _ s.refs s.space t.store t.memory t.mdomain
          ((_,Word ww)::vars)` assume_tac
       \\ drule memory_rel_list_limit
       \\ rfs [good_dimindex_def] \\ rfs [dimword_def])
@@ -4522,7 +4522,7 @@ Proof
     \\ strip_tac \\ rw [option_le_max_right]
     \\ full_simp_tac std_ss [GSYM APPEND_ASSOC]
     \\ match_mp_tac memory_rel_insert
-    \\ fs [] \\ match_mp_tac memory_rel_Unit \\ fs [])
+    \\ fs [] \\ match_mp_tac memory_rel_Unit \\ rfs [])
   \\ fs [SilentFFI_def,wordSemTheory.evaluate_def,eq_eval]
   \\ fs [wordSemTheory.evaluate_def,SilentFFI_def,wordSemTheory.word_exp_def,
          wordSemTheory.set_var_def,EVAL ``read_bytearray 0w 0 m``,
@@ -4563,7 +4563,7 @@ Proof
   \\ strip_tac \\ rw [option_le_max_right]
   \\ full_simp_tac std_ss [GSYM APPEND_ASSOC]
   \\ match_mp_tac memory_rel_insert
-  \\ fs [] \\ match_mp_tac memory_rel_Unit \\ fs []
+  \\ fs [] \\ match_mp_tac memory_rel_Unit \\ rfs []
 QED
 
 Theorem assign_WordToInt:
@@ -11487,6 +11487,83 @@ Proof
   \\ fs [] \\ rw [] \\ fs []
 QED
 
+Theorem StoreEachWord_thm:
+   !offs t.
+   store_list (base + offs) (MAP Word ws) t.memory t.mdomain = SOME nmem /\
+   lookup 1 t.locals = SOME (Word base) ==>
+   ?loc. evaluate (StoreEachWord 1 3 offs ws, t) =
+      (NONE, t with <| memory := nmem; locals := loc |>) /\
+      !n. n <> 1 /\ n <> 3 ==> lookup n loc = lookup n t.locals
+Proof
+   Induct_on `ws`
+   \\ fs[store_list_def,StoreEachWord_def]
+   \\ eval_tac
+   \\ rpt strip_tac
+   THEN1 (qexists_tac`t.locals` >> rw[wordSemTheory.state_component_equality])
+   \\ simp[lookup_insert,wordSemTheory.get_var_def,wordSemTheory.mem_store_def]
+   \\ first_x_assum (qspecl_then[`offs + bytes_in_word`,
+      `t with <| locals := insert 3 (Word h) t.locals;
+                 memory := (base + offs =+ Word h) t.memory |>`] assume_tac)
+   \\ rfs[lookup_insert,wordSemTheory.state_component_equality]
+QED
+
+Theorem assign_String:
+   (?strg. op = String strg) ==> ^assign_thm_goal
+Proof
+   rpt strip_tac
+   \\ rpt_drule0 state_rel_cut_IMP \\ rw[]
+   \\ qpat_x_assum `state_rel c l1 l2 s _ _ _` kall_tac
+   \\ Cases_on`args` >-
+      (rveq>>fs[get_vars_def,do_app_def,do_app_aux_def]>>every_case_tac>>fs[])
+   \\ qmatch_assum_rename_tac`get_vars (strv::args) x.locals = _`
+   \\ REVERSE(Cases_on`args`) >-
+      (rveq>>fs[get_vars_def,do_app_def,do_app_aux_def]>>every_case_tac>>fs[])
+   \\ fs[get_vars_def] \\ every_case_tac \\ rw[]
+   \\ fs[do_app_def,do_space_def,dataLangTheory.op_space_reset_def,
+         data_spaceTheory.op_space_req_def,do_app_aux_def] \\ every_case_tac \\ fs[] \\ rveq
+   \\ qmatch_assum_rename_tac`lookup ref _ = SOME (ByteArray _ oldlen)`
+   \\ `∃w. get_var (adjust_var strv) t = SOME w` by
+      fs[state_rel_thm,GSYM IS_SOME_EXISTS,wordSemTheory.get_var_def,get_var_def]
+   \\ rfs[GSYM get_var_def]
+   \\ `memory_rel c t.be (THE x.tstamps) x.refs x.space t.store t.memory t.mdomain
+          (join_env x.locals (toAList (inter t.locals (adjust_set x.locals))) ++
+           ([(the_global x.global,t.store ' Globals)] ++ flat x.stack t.stack)) ∧
+       good_dimindex (:α) ∧ shift_length c < dimindex (:α) ∧ c.big_endian = t.be`
+       by fs[state_rel_thm]
+   \\ rpt_drule0 (memory_rel_get_var_IMP) \\ disch_tac
+   \\ fs[get_var_def]
+   \\ `byte_len (:α) (STRLEN strg) = STRLEN strg DIV (dimindex (:α) DIV 8) + 1`
+       by fs[byte_len_def,good_dimindex_def]
+   \\ rpt_drule0 memory_rel_ByteArray_IMP \\ strip_tac
+   \\ rpt_drule0 get_real_addr_lemma \\ strip_tac
+   \\ first_x_assum (qspec_then`MAP (n2w o ORD) strg` assume_tac) \\ fs[]
+   \\ Q.ISPECL_THEN[`a`,`write_bytes (MAP (n2w o ORD) strg)
+        (REPLICATE (STRLEN strg DIV (dimindex (:α) DIV 8) + 1) 0w) t.be:'a word list`,
+      `nm`,`bytes_in_word:'a word`, `t with locals := insert 1 (Word a) t.locals`]
+      assume_tac (Q.GENL[`base`,`ws`,`nmem`] StoreEachWord_thm)
+   \\ rfs[lookup_insert,o_DEF]
+   \\ simp[assign_def,Unit_def]
+   \\ eval_tac
+   \\ fs[lookup_insert,state_rel_thm,Unit_def,do_stack_def,stack_consumed_def,
+         allowed_op_def]
+   \\ conj_tac THEN1 rw[]
+   \\ fs[]
+   \\ conj_tac THEN1 simp[option_le_max_right]
+   \\ full_simp_tac std_ss [GSYM APPEND_ASSOC]
+   \\ match_mp_tac memory_rel_insert
+   \\ full_simp_tac std_ss [GSYM APPEND_ASSOC,APPEND]
+   \\ match_mp_tac memory_rel_Unit
+   \\ simp[]
+   \\ full_simp_tac bool_ss [Once CONS_APPEND]
+   \\ drule0 memory_rel_drop
+   \\ `inter loc (adjust_set x.locals) = inter t.locals (adjust_set x.locals)`
+      suffices_by FULL_SIMP_TAC std_ss [GSYM APPEND_ASSOC,APPEND]
+   \\ rw[lookup_inter]
+   \\ Cases_on`x' <> 1 /\ x' <> 3`
+   \\ fs[lookup_1_adjust_set,lookup_3_adjust_set]
+   \\ every_case_tac
+QED
+
 Theorem assign_UpdateByte:
    op = UpdateByte ==> ^assign_thm_goal
 Proof
@@ -12512,6 +12589,7 @@ Proof
                    flat x.stack s1.stack))`
   THEN1
    (simp [Abbr`ar4`,Abbr`ar6`]
+    \\ qpat_x_assum`s1.be = t.be` (assume_tac o GSYM) >> rw[]
     \\ full_simp_tac std_ss [GSYM APPEND_ASSOC]
     \\ match_mp_tac IMP_memcopy \\ fs []
     \\ qexists_tac `w_ptr`

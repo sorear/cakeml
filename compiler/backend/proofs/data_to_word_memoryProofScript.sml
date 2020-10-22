@@ -144,13 +144,6 @@ val BlockRep_def = Define `
 Type ml_el = ``:('a word_loc, tag # ('a word_loc list)) heap_element``
 Type ml_heap = ``:'a ml_el list``
 
-val write_bytes_def = Define `
-  (write_bytes bs [] be = []) /\
-  (write_bytes bs ((w:'a word)::ws) be =
-     let k = dimindex (:'a) DIV 8 in
-       bytes_to_word k 0w bs w be
-          :: write_bytes (DROP k bs) ws be)`
-
 val Bytes_def = Define`
   ((Bytes is_bigendian cmp_by_contents (bs:word8 list) (ws:'a word list)):'a ml_el) =
     let ws = write_bytes bs ws is_bigendian in
@@ -5917,11 +5910,6 @@ val memory_rel_RefArray = save_thm("memory_rel_RefArray",
   |> (fn th => MATCH_MP th (UNDISCH memory_rel_REPLICATE))
   |> DISCH_ALL |> REWRITE_RULE [AND_IMP_INTRO,GSYM CONJ_ASSOC]);
 
-val byte_len_def = Define `
-  byte_len (:'a) num_bytes =
-    if dimindex (:'a) = 32 then num_bytes DIV 4 + 1
-                           else num_bytes DIV 8 + 1`;
-
 val word_of_byte_def = Define `
   word_of_byte (w:'a word) =
     let w = (w << 8 || w) in
@@ -5931,6 +5919,66 @@ val word_of_byte_def = Define `
 val ADD_DIV_EQ = save_thm("ADD_DIV_EQ",LIST_CONJ
   [GSYM ADD_DIV_ADD_DIV,
    ONCE_REWRITE_RULE [ADD_COMM] (GSYM ADD_DIV_ADD_DIV)])
+
+Theorem word_slice_alt_and:
+   word_slice_alt (dimindex (:α)) lo (val:α word) = val && (~0w << lo) ∧
+   word_slice_alt xhi lo val = val && (~(~0w << (xhi - lo)) << lo)
+Proof
+   conj_tac
+   >> SIMP_TAC bool_ss [word_slice_alt_def,word_1comp_def,
+     word_lsl_def,word_and_def,fcpTheory.CART_EQ,
+     fcpTheory.FCP_BETA]
+   >> rpt strip_tac
+   >> `i - lo < dimindex (:'a)` by simp[]
+   >> TRY(`i - lo - (xhi - lo) < dimindex (:'a)` by simp[])
+   >> ASM_SIMP_TAC bool_ss [word_0,word_1comp_def,fcpTheory.FCP_BETA]
+   >> Cases_on`(val ' i)` >> fs[]
+QED
+
+(* still not executable because no variable shifts *)
+Theorem set_byte_shifts:
+   set_byte a b w be = let i = byte_index a be in
+      (w && ~(0xFFw << i)) || (w2w b << i)
+Proof
+   SIMP_TAC bool_ss [LET_THM,set_byte_def,word_slice_alt_and,word_and_def,word_or_def,
+      word_lsl_def,word_1comp_def,fcpTheory.CART_EQ] >>
+   rpt strip_tac >>
+   `i - (byte_index a be + 8) < dimindex (:α)` by simp[] >>
+   `i - byte_index a be < dimindex (:α)` by simp[] >>
+   ASM_SIMP_TAC bool_ss [word_and_def,word_or_def,fcpTheory.FCP_BETA,SUB_0,word_1comp_def,
+      word_0] >>
+   Cases_on`w ' i` >> fs[] >>
+   Cases_on`byte_index a be ≤ i` >> fs [] >>
+   Cases_on`(w2w b:'a word) ' (i - byte_index a be)` >> fs[] >>
+   simp[n2w_def,fcpTheory.FCP_BETA]
+QED
+
+Theorem set_byte_exec_thm:
+   good_dimindex (:α) ⇒
+   (set_byte_exec : α word -> word8 -> α word -> bool -> α word) = set_byte ∧
+   (bytes_to_word_exec:num -> α word -> word8 list -> α word -> bool -> α word) = bytes_to_word
+Proof
+   disch_tac >> conj_asm1_tac
+   >- (
+      rpt (CONV_TAC FUN_EQ_CONV >> gen_tac)
+      >> qmatch_rename_tac`_ = set_byte a by w be`
+      >> fs[set_byte_shifts,set_byte_exec_def,byte_index_def,good_dimindex_def]
+      >> TRY(qpat_assum`_ = 32` kall_tac >>
+         `w2n a MOD 4 = 0 ∨ w2n a MOD 4 = 1 ∨ w2n a MOD 4 = 2 ∨ w2n a MOD 4 = 3 ∨
+          ~(w2n a MOD 4 < 4)` by DECIDE_TAC)
+      >> TRY(qpat_assum`_ = 64` kall_tac >>
+         `w2n a MOD 8 = 0 ∨ w2n a MOD 8 = 1 ∨ w2n a MOD 8 = 2 ∨ w2n a MOD 8 = 3 ∨
+          w2n a MOD 8 = 4 ∨ w2n a MOD 8 = 5 ∨ w2n a MOD 8 = 6 ∨ w2n a MOD 8 = 7 ∨
+          ~(w2n a MOD 8 < 8)` by DECIDE_TAC)
+      >> Cases_on `be`
+      >> FULL_SIMP_TAC std_ss [MOD_LESS, MULT_DIV, DECIDE ``8:num * x = x * 8``]
+      >> simp[]
+   )
+   >> rpt (CONV_TAC FUN_EQ_CONV >> gen_tac)
+   >> qmatch_rename_tac`_ = bytes_to_word k a bs w be`
+   >> Q.SPEC_TAC(`bs`,`bs`) >> Q.SPEC_TAC(`a`,`a`)
+   >> Induct_on`k` >> strip_tac >> Cases_on`bs` >> fs[bytes_to_word_def,bytes_to_word_exec_def]
+QED
 
 val set_byte_word_of_byte = Q.prove(
   `good_dimindex (:'a) ==>
@@ -5959,7 +6007,7 @@ val write_bytes_REPLICATE = Q.prove(
       good_dimindex (:'a) ==>
       write_bytes (REPLICATE m w) (REPLICATE n (word_of_byte (w2w w))) be =
       REPLICATE n (word_of_byte ((w2w w):'a word))`,
-  Induct \\ fs [write_bytes_def,REPLICATE,DROP_REPLICATE] \\ rw []
+  Induct \\ fs [write_bytes_def,set_byte_exec_thm,REPLICATE,DROP_REPLICATE] \\ rw []
   \\ qspec_tac (`m`,`m`)
   \\ qspec_tac (`0w:'a word`,`a`)
   \\ qspec_tac (`dimindex (:α) DIV 8`,`n`)
@@ -6108,8 +6156,8 @@ Theorem write_bytes_inj_lemma:
    ⇒
    write_bytes bs' w1 be = write_bytes bs' w2 be
 Proof
-  strip_tac \\ Induct >- rw[] \\ rw[Once write_bytes_def]
-  \\ Cases_on`w2` \\ fs[write_bytes_def] \\ rw[]
+  strip_tac \\ Induct >- rw[] \\ rw[Once write_bytes_def,set_byte_exec_thm]
+  \\ Cases_on`w2` \\ rfs[write_bytes_def,set_byte_exec_thm] \\ rw[]
   >- (match_mp_tac bytes_to_word_eq_lemma \\ fs [])
   \\ first_x_assum match_mp_tac
   \\ rw[] \\ asm_exists_tac \\ simp[]
@@ -6196,7 +6244,7 @@ Theorem write_bytes_change_extra:
      write_bytes bs (ws:'a word list) be = write_bytes bs ws' be
 Proof
   Induct \\ rw[write_bytes_def,LENGTH_NIL_SYM]
-  \\ Cases_on`ws'` \\ fs[write_bytes_def]
+  \\ Cases_on`ws'` \\ fs[write_bytes_def,set_byte_exec_thm]
   \\ reverse conj_tac
   >- (
     first_x_assum match_mp_tac
@@ -6366,7 +6414,7 @@ Proof
   \\ `ws1 = ws2` by (
     unabbrev_all_tac \\ fs [map_replicate] \\
     Cases_on`byte_len (:'a) n` \\ fs[]
-    >- ( fs[byte_len_def,REPLICATE,LUPDATE_def,write_bytes_def] )
+    >- ( fs[byte_len_def,REPLICATE,LUPDATE_def,write_bytes_def,set_byte_exec_thm] )
     \\ rename1`REPLICATE l`
     \\ rewrite_tac[GSYM REPLICATE]
     \\ rewrite_tac[REPLICATE_SNOC]
@@ -6380,7 +6428,7 @@ Proof
       \\ disch_then(qspecl_then[`l`,`n`]SUBST_ALL_TAC)
       \\ match_mp_tac write_bytes_change_extra
       \\ simp[] )
-    \\ simp[write_bytes_def]
+    \\ simp[write_bytes_def,set_byte_exec_thm]
     \\ simp[DROP_REPLICATE]
     \\ match_mp_tac (GEN_ALL last_bytes_bytes_to_word_REPLICATE)
     \\ simp[LESS_OR_EQ]
@@ -6983,16 +7031,17 @@ QED
 
 Theorem write_bytes_same:
    ∀ws b1 b2.
+   good_dimindex(:α) ∧
    (∀n. n < LENGTH (ws:α word list) * (dimindex(:α) DIV 8) ⇒ n < LENGTH b1 ∧ n < LENGTH b2 ∧ EL n b1 = EL n b2)
    ⇒ write_bytes b1 ws be = write_bytes b2 ws be
 Proof
-   Induct \\ rw[write_bytes_def]
+   Induct_on`ws` \\ rw[write_bytes_def,set_byte_exec_thm]
    >- (
      match_mp_tac bytes_to_word_same
      \\ gen_tac \\ strip_tac
      \\ first_x_assum match_mp_tac
      \\ simp[ADD1] )
-  \\ first_x_assum match_mp_tac
+  \\ first_x_assum match_mp_tac \\ simp[]
   \\ gen_tac \\ strip_tac
   \\ fs[MULT]
   \\ qpat_abbrev_tac`bw= _ DIV _`
@@ -7143,7 +7192,7 @@ Proof
     \\ fs[Abbr`bs`,DIV_LE_X,Abbr`bw`])
   \\ clean_tac
   \\ REWRITE_TAC[write_bytes_APPEND]
-  \\ simp[write_bytes_def]
+  \\ simp[write_bytes_def,set_byte_exec_thm]
   \\ qpat_abbrev_tac`bt = DROP _ (DROP _ bs)`
   \\ qpat_abbrev_tac`bt' = DROP _ (DROP _ bs')`
   \\ `bt' = bt`
@@ -7221,6 +7270,27 @@ val hide_memory_rel_def = Define`
 val hide_heap_in_memory_store_def = Define`
   hide_heap_in_memory_store = heap_in_memory_store`;
 
+Theorem heap_common_prefix:
+   heap_length hp1 = heap_length hp2 /\ hp1 ++ hs1 = hp2 ++ hs2 ==> hp1 = hp2
+Proof
+   qspec_tac(`hp2`,`hp2`)
+   \\ Induct_on `hp1`
+   \\ Cases_on `hp2`
+   \\ rpt strip_tac
+   \\ fs[heap_length_def]
+QED
+
+val n2w_add = Q.prove(`n2w (x + y) = n2w x + n2w y`,simp[word_add_def]);
+
+Theorem map_word_eq:
+ !l1 l2. (MAP Word l1 = MAP Word l2) ⇔ (l1 = l2)
+Proof
+ Induct_on `l1` >>
+ srw_tac[][] >>
+ Cases_on `l2` >>
+ srw_tac[][]
+QED
+
 Theorem memory_rel_ByteArray_IMP:
    memory_rel c be ts refs sp st m dm ((RefPtr p,v:'a word_loc)::vars) /\
    lookup p refs = SOME (ByteArray fl vals) /\ good_dimindex (:'a) ==>
@@ -7232,6 +7302,11 @@ Theorem memory_rel_ByteArray_IMP:
      (!i. i < LENGTH vals ==>
           mem_load_byte_aux m dm be (a + bytes_in_word + n2w i) =
           SOME (EL i vals)) /\
+     (∀bs. LENGTH bs = LENGTH vals ⇒ ∃nm.
+       let ws = write_bytes bs (REPLICATE (byte_len (:α) (LENGTH bs)) 0w) be in
+       store_list (a + bytes_in_word) (MAP Word ws) m dm = SOME nm ∧
+       memory_rel c be ts (insert p (ByteArray fl bs) refs) sp st
+         nm dm ((RefPtr p,v)::vars)) ∧
      (∀i w. i < LENGTH vals ⇒
        let addr = a + bytes_in_word + n2w i in
        memory_rel c be ts (insert p (ByteArray fl (LUPDATE w i vals)) refs) sp st
@@ -7357,7 +7432,7 @@ Proof
     \\ fs [write_bytes_APPEND]
     \\ `i DIV 2 ** k = LENGTH (write_bytes vals ys be)` by
           metis_tac [LENGTH_write_bytes]
-    \\ asm_simp_tac std_ss [write_bytes_def,LET_DEF,GSYM APPEND_ASSOC,APPEND]
+    \\ asm_simp_tac std_ss [write_bytes_def,set_byte_exec_thm,LET_DEF,GSYM APPEND_ASSOC,APPEND]
     \\ asm_simp_tac std_ss [EL_LENGTH_APPEND,NULL_DEF,HD]
     \\ fs [] \\ pop_assum (fn th => fs [GSYM th]) \\ fs []
     \\ `EL i vals =
@@ -7373,6 +7448,39 @@ Proof
     \\ rpt_drule DIVISION
     \\ disch_then (qspec_then `i` strip_assume_tac)
     \\ decide_tac)
+  \\ conj_tac
+  >- (
+    rpt strip_tac
+    \\ `byte_len (:'a) (LENGTH vals) = LENGTH vals DIV (dimindex (:'a) DIV 8) + 1` by
+       fs[good_dimindex_def,byte_len_def] \\ simp[]
+    \\ qmatch_assum_abbrev_tac`(wha * wheader * _ * whb * wother) _`
+    \\ qmatch_goalsub_abbrev_tac`store_list _ len_words`
+    \\ `(word_list_exists (curr + bytes_in_word + bytes_in_word * n2w (heap_length ha))
+           (LENGTH len_words) * (wha * wheader * whb * wother)) (fun2set (m,dm))` by
+       (simp[word_list_exists_def,SEP_CLAUSES,SEP_EXISTS_THM]
+        \\ qexists_tac`MAP Word (write_bytes vals (REPLICATE (LENGTH vals DIV
+               (dimindex (:α) DIV 8) + 1) 0w) be)`
+        \\ fs[AC STAR_COMM STAR_ASSOC,Abbr`len_words`,SEP_CLAUSES])
+    \\ drule store_list_thm \\ rpt strip_tac
+    \\ qmatch_assum_rename_tac`store_list _ _ _ _ = SOME nm`
+    \\ qexists_tac`nm` \\ simp[hide_memory_rel_def,memory_rel_def]
+    \\ qpat_x_assum`LENGTH bs = LENGTH vals` (assume_tac o GSYM)
+    \\ qpat_x_assum`!ys. LENGTH vals = LENGTH ys ==> _` drule \\ rpt strip_tac
+    \\ qexistsl_tac[`h1 ++ [DataElement [] (LENGTH ws) (BytesTag fl (LENGTH bs),
+                            MAP Word (write_bytes bs ws be))] ++ h2`, `limit`,
+                    `a`,`sp'`,`sp1`,`gens`]
+    \\ simp[word_ml_inv_def,PULL_EXISTS]
+    \\ qexistsl_tac[`Pointer (heap_length ha) (Word 0w)`,`xs`]
+    \\ rfs[word_addr_def,heap_in_memory_store_def]
+    \\ `ha = h1` by (FULL_SIMP_TAC bool_ss [GSYM APPEND_ASSOC] \\
+          irule heap_common_prefix \\ simp[] \\ asm_exists_tac \\ fs[])
+    \\ `write_bytes bs ws be = write_bytes bs (REPLICATE (LENGTH bs DIV (dimindex (:α) DIV 8) + 1) 0w) be` by
+       (irule write_bytes_inj_lemma \\ fs[] \\ qexists_tac`vals` \\ fs[map_word_eq])
+    \\ fs[word_heap_APPEND,word_heap_def,word_el_def,word_payload_def,word_list_def,
+          heap_length_def,el_length_def,n2w_add,Abbr`wheader`,Abbr`whb`,Abbr`wha`,
+          Abbr`len_words`,AC STAR_ASSOC STAR_COMM,SEP_CLAUSES,WORD_LEFT_ADD_DISTRIB,
+          SUM_APPEND]
+  )
   \\ conj_tac
   >- (
     rpt strip_tac
@@ -9311,7 +9419,7 @@ Theorem write_bytes_inj:
      (write_bytes bs1 (ws:'a word list) be = write_bytes bs2 ws be ⇔ bs1 = bs2)
 Proof
   strip_tac \\ Induct
-  \\ simp[write_bytes_def,LENGTH_NIL,LENGTH_NIL_SYM]
+  \\ simp[write_bytes_def,set_byte_exec_thm,LENGTH_NIL,LENGTH_NIL_SYM]
   \\ rw[] \\ rw[EQ_IMP_THM] \\ fs[MULT_CLAUSES]
   \\ qmatch_asmsub_abbrev_tac`bytes_to_word bw 0w bs1 _ _`
   \\ `0 < bw` by fs[Abbr`bw`,X_LT_DIV,good_dimindex_def]

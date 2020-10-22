@@ -4418,6 +4418,7 @@ val state_rel_thm = Define `
       t.compile t.compile_oracle t.code_buffer t.data_buffer /\
     good_dimindex (:'a) /\
     shift_length c < dimindex (:'a) /\
+    c.big_endian = t.be /\
     IS_SOME s.tstamps /\
     (* the store *)
     EVERY (\n. n IN FDOM t.store) [Globals] /\
@@ -4509,6 +4510,7 @@ Theorem state_rel_init:
     lim.has_fp_ops = c.has_fp_ops /\
     lim.has_fp_tops = c.has_fp_tern /\
     conf_ok (:'a) c /\
+    c.big_endian = t.be /\
     init_store_ok c t.store t.memory t.mdomain t.code_buffer t.data_buffer ==>
     state_rel c l1 l2 (initial_state ffi code co cc T lim t.stack_size t.clock)
                       (t:('a,'c,'ffi) state) [] []

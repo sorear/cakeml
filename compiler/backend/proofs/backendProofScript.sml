@@ -364,11 +364,6 @@ val bvl_to_bvi_compile_inc_all_def = Define `
     let c = c with <| next_name2 := nn2 |> in
     (c, p)`;
 
-val ensure_fp_conf_ok_def = Define `
-  ensure_fp_conf_ok asm_c c =
-  c with <|has_fp_ops := (1 < asm_c.fp_reg_count);
-          has_fp_tern := (asm_c.ISA = ARMv7 ∧ 2 < asm_c.fp_reg_count)|>`;
-
 val compile_inc_progs_def = Define`
   compile_inc_progs c p =
     let ps = empty_progs with <| source_prog := p |> in
@@ -386,7 +381,7 @@ val compile_inc_progs_def = Define`
     let p = bvi_to_data_compile_prog p in
     let ps = ps with <| data_prog := p |> in
     let asm_c = c.lab_conf.asm_conf in
-    let dc = ensure_fp_conf_ok asm_c c.data_conf in
+    let dc = prepare_data_conf asm_c c.data_conf in
     let p = MAP (compile_part dc) p in
     let reg_count1 = asm_c.reg_count - (5 + LENGTH asm_c.avoid_regs) in
     let p = MAP (\p. full_compile_single asm_c.two_reg_arith reg_count1
@@ -602,7 +597,7 @@ Theorem cake_orac_eqs:
   cake_orac c' src f3 (\ps. ps.data_prog)
   /\ (
   compile c prog = SOME (b,bm,c') /\
-    dc = ensure_fp_conf_ok c.lab_conf.asm_conf c.data_conf /\
+    dc = prepare_data_conf c.lab_conf.asm_conf c.data_conf /\
     tr_c = c.lab_conf.asm_conf.two_reg_arith /\
     reg_c = c.lab_conf.asm_conf.reg_count -
         (LENGTH c.lab_conf.asm_conf.avoid_regs + 5) /\
@@ -2247,7 +2242,8 @@ Proof
     \\ simp[PULL_EXISTS] \\ rw[]
     \\ irule data_to_wordProofTheory.comp_no_inst
     \\ drule_then (fn t => simp [t]) cake_orac_config_eqs
-    \\ fs[backend_config_ok_def, asmTheory.offset_ok_def, ensure_fp_conf_ok_def]
+    \\ fs[backend_config_ok_def, asmTheory.offset_ok_def,
+          data_to_wordTheory.prepare_data_conf_def]
     \\ rpt (pairarg_tac \\ fs[])
     \\ fsrw_tac[DNF_ss][]
     \\ conj_tac \\ first_x_assum irule
@@ -2583,6 +2579,17 @@ Proof
   metis_tac []
 QED
 
+(* TODO MOVE *)
+Theorem full_make_init_be:
+  stackSem$state_be (FST(stack_to_labProof$full_make_init a b c d e f g h i j k l)) = i.be
+Proof
+  simp[full_make_init_def,stack_allocProofTheory.make_init_def,
+       stack_removeProofTheory.make_init_any_def,stack_namesProofTheory.make_init_def,
+       stack_to_labProofTheory.make_init_def,stack_removeProofTheory.make_init_opt_def] >>
+  every_case_tac >> simp[stack_removeProofTheory.init_reduce_def] >>
+  drule stackPropsTheory.evaluate_consts >> simp[]
+QED
+
 Theorem compile_correct':
 
   compile (c:'a config) prog = SOME (bytes,bitmaps,c') ⇒
@@ -2688,7 +2695,7 @@ Proof
                             cfg (MAP (λp. full_compile_single mc.target.config.two_reg_arith (mc.target.config.reg_count - (LENGTH mc.target.config.avoid_regs + 5))
                             c.word_to_word_conf.reg_alg
                             (mc:('a,'b,'c)machine_config).target.config (p,NONE)) progs)) o
-                            MAP (compile_part (ensure_fp_conf_ok mc.target.config c.data_conf))))))``
+                            MAP (compile_part (prepare_data_conf mc.target.config c.data_conf))))))``
      |> ISPEC)
    |> Q.GEN`co`
    |> Q.GEN`c`
@@ -2808,8 +2815,7 @@ Proof
   strip_tac \\
   qabbrev_tac`kkk = stk - 2`>>
   qmatch_goalsub_abbrev_tac`dataSem$semantics _ _ data_oracle` \\
-  qabbrev_tac `c4_data_conf = (c4.data_conf with <| has_fp_ops := (1 < c4.lab_conf.asm_conf.fp_reg_count);
-                                                    has_fp_tern := (c4.lab_conf.asm_conf.ISA = ARMv7 /\ 2 < c4.lab_conf.asm_conf.fp_reg_count) |>)` \\
+  qabbrev_tac `c4_data_conf = prepare_data_conf c4.lab_conf.asm_conf c4.data_conf` \\
   qabbrev_tac`lab_st:('a,'a lab_to_target$config,'ffi) labSem$state = lab_to_targetProof$make_init mc ffi io_regs cc_regs tar_st m (dm ∩ byte_aligned) ms p7 lab_to_target$compile
        (mc.target.get_pc ms + n2w (LENGTH bytes)) cbspace lab_oracle` \\
 
@@ -2971,6 +2977,7 @@ Proof
     conj_tac
     >- fs [data_to_wordTheory.conf_ok_def,
            data_to_wordTheory.shift_length_def] \\
+    conj_tac >- simp[full_make_init_be,make_init_def,data_to_wordTheory.prepare_data_conf_def] \\
     CONJ_TAC>- (
       fs[Abbr`data_oracle`,full_co_def]
       \\ fs [backendPropsTheory.SND_state_co]
@@ -2992,7 +2999,7 @@ Proof
       simp [Abbr `data_oracle`]
       \\ simp [GSYM pure_co_def]
       \\ drule_then (irule o GSYM) data_to_word_orac_eq
-      \\ fs [markerTheory.Abbrev_def, ensure_fp_conf_ok_def]
+      \\ fs [markerTheory.Abbrev_def]
     )
     \\ qmatch_goalsub_abbrev_tac`dataSem$semantics _ _ _ TODO_cc'`
     \\ qpat_x_assum`dataSem$semantics _ _ _ _ _ _ _ ≠ Fail`mp_tac
@@ -3005,7 +3012,6 @@ Proof
     \\ rpt gen_tac
     \\ AP_TERM_TAC
     \\ simp[Abbr`kkk`,Abbr`stk`]
-    \\ simp[ensure_fp_conf_ok_def]
     \\ AP_THM_TAC \\ AP_THM_TAC
     \\ simp[full_make_init_compile]
     \\ simp[EVAL``(lab_to_targetProof$make_init a b c d e f g h i j k l m).compile``]
@@ -3234,6 +3240,7 @@ Proof
      \\ rewrite_tac [read_limits_def]
      \\ simp [Abbr`real_max_heap`,data_to_wordTheory.max_heap_limit_def,
               data_to_wordTheory.shift_length_def]
+     \\ simp[data_to_wordTheory.prepare_data_conf_def]
      \\ AP_TERM_TAC \\ simp [stack_removeProofTheory.read_pointers_def]
      \\ simp [Abbr`stack_names_init`,stack_namesProofTheory.make_init_def]
      \\ simp [stack_to_labProofTheory.make_init_def]
@@ -3288,7 +3295,7 @@ Proof
        \\ once_rewrite_tac [dataPropsTheory.semantics_zero_limits]
        \\ fs [extend_with_resource_limit'_def])
     \\ simp[Abbr`foo1`,Abbr`foo2`]
-    \\ simp[FUN_EQ_THM, ensure_fp_conf_ok_def]
+    \\ simp[FUN_EQ_THM]
     \\ rpt gen_tac \\ AP_TERM_TAC
     \\ qhdtm_assum`stack_to_labProof$full_make_init`(mp_tac o Q.AP_TERM`FST`)
     \\ simp_tac std_ss []
@@ -3374,7 +3381,7 @@ Proof
     \\ `foo1 = foo2 /\ orac1 = orac2` suffices_by metis_tac []
     \\ simp[Abbr`foo1`,Abbr`foo2`,Abbr`orac1`,Abbr`orac2`,FUN_EQ_THM,
         Abbr `data_oracle`]
-    \\ simp [GSYM simple_orac_eqs, ensure_fp_conf_ok_def]
+    \\ simp [GSYM simple_orac_eqs]
     \\ rpt gen_tac \\ AP_TERM_TAC
     \\ AP_THM_TAC
     \\ simp[EVAL``(word_to_stackProof$make_init a b c d e).compile``]

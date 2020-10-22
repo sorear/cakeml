@@ -6114,8 +6114,17 @@ Proof
   rpt(pairarg_tac>>fs[call_args_def])
 QED
 
+Theorem prepare_data_conf_preserves[simp]:
+  (prepare_data_conf ac dconf).gc_kind = dconf.gc_kind /\
+  (prepare_data_conf ac dconf).len_bits = dconf.len_bits /\
+  (prepare_data_conf ac dconf).len_size = dconf.len_size /\
+  (prepare_data_conf ac dconf).tag_bits = dconf.tag_bits
+Proof
+  EVAL_TAC
+QED
+
 Theorem compile_has_fp_ops[simp]:
-  compile (dconf with <| has_fp_ops := b1; has_fp_tern := b2 |>) code = compile dconf code
+  compile (prepare_data_conf ac dconf) code = compile dconf code
 Proof
   fs [compile_def,stubs_def,word_gc_code_def]
   \\ every_case_tac \\ fs []

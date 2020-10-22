@@ -28,7 +28,7 @@ QED
 val IMP_EQ_DISJ = METIS_PROVE [] ``(b1 ==> b2) <=> ~b1 \/ b2``
 
 Theorem shift_length_has_fp_ops[simp]:
-  shift_length (conf with <| has_fp_ops := b1; has_fp_tern := b2 |>) = shift_length conf
+  shift_length (prepare_data_conf ac conf) = shift_length conf
 Proof
   EVAL_TAC
 QED
@@ -556,41 +556,44 @@ QED
 
 (* lemmas about has_fp_ops *)
 Theorem word_gc_fun_assum_has_fp_ops[simp]:
-   word_gc_fun_assum (conf with <| has_fp_ops := b1; has_fp_tern := b2 |>) s =
+   word_gc_fun_assum (prepare_data_conf ac conf) s =
     word_gc_fun_assum conf s
 Proof
   EVAL_TAC \\ fs []
 QED
 
 Theorem word_gc_move_has_fp_ops[simp]:
-   !x. word_gc_move (conf with <| has_fp_ops := b1; has_fp_tern := b2 |>) x =
+   !x. word_gc_move (prepare_data_conf ac conf) x =
         word_gc_move conf x
 Proof
   simp_tac std_ss [FORALL_PROD] \\ Cases
   \\ simp_tac std_ss [FORALL_PROD,word_gc_move_def]
-  \\ fs [ptr_to_addr_def,update_addr_def,small_shift_length_def,decode_length_def]
+  \\ fs [ptr_to_addr_def,update_addr_def,small_shift_length_def,decode_length_def,
+         prepare_data_conf_def]
 QED
 
 Theorem word_gen_gc_move_has_fp_ops[simp]:
-   !x. word_gen_gc_move (conf with <| has_fp_ops := b1; has_fp_tern := b2 |>) x =
+   !x. word_gen_gc_move (prepare_data_conf ac conf) x =
         word_gen_gc_move conf x
 Proof
   simp_tac std_ss [FORALL_PROD] \\ Cases
   \\ simp_tac std_ss [FORALL_PROD,word_gen_gc_move_def]
-  \\ fs [ptr_to_addr_def,update_addr_def,small_shift_length_def,decode_length_def]
+  \\ fs [ptr_to_addr_def,update_addr_def,small_shift_length_def,decode_length_def,
+         prepare_data_conf_def]
 QED
 
 Theorem word_gen_gc_partial_move_has_fp_ops[simp]:
-   !x. word_gen_gc_partial_move (conf with <| has_fp_ops := b1; has_fp_tern := b2 |>) x =
+   !x. word_gen_gc_partial_move (prepare_data_conf ac conf) x =
         word_gen_gc_partial_move conf x
 Proof
   simp_tac std_ss [FORALL_PROD] \\ Cases
   \\ simp_tac std_ss [FORALL_PROD,word_gen_gc_partial_move_def]
-  \\ fs [ptr_to_addr_def,update_addr_def,small_shift_length_def,decode_length_def]
+  \\ fs [ptr_to_addr_def,update_addr_def,small_shift_length_def,decode_length_def,
+         prepare_data_conf_def]
 QED
 
 Theorem word_gc_move_list_has_fp_ops[simp]:
-   !conf x. word_gc_move_list (conf with <| has_fp_ops := b1; has_fp_tern := b2 |>) x =
+   !conf x. word_gc_move_list (prepare_data_conf ac conf) x =
              word_gc_move_list conf x
 Proof
   simp_tac std_ss [FORALL_PROD]
@@ -600,7 +603,7 @@ Proof
 QED
 
 Theorem word_gen_gc_move_list_has_fp_ops[simp]:
-   !conf x. word_gen_gc_move_list (conf with <| has_fp_ops := b1; has_fp_tern := b2 |>) x =
+   !conf x. word_gen_gc_move_list (prepare_data_conf ac conf) x =
              word_gen_gc_move_list conf x
 Proof
   simp_tac std_ss [FORALL_PROD]
@@ -610,7 +613,7 @@ Proof
 QED
 
 Theorem word_gen_gc_partial_move_list_has_fp_ops[simp]:
-   !conf x. word_gen_gc_partial_move_list (conf with <| has_fp_ops := b1; has_fp_tern := b2 |>) x =
+   !conf x. word_gen_gc_partial_move_list (prepare_data_conf ac conf) x =
              word_gen_gc_partial_move_list conf x
 Proof
   simp_tac std_ss [FORALL_PROD]
@@ -620,7 +623,7 @@ Proof
 QED
 
 Theorem word_gc_move_roots_has_fp_ops[simp]:
-   !conf x. word_gc_move_roots (conf with <| has_fp_ops := b1; has_fp_tern := b2 |>) x =
+   !conf x. word_gc_move_roots (prepare_data_conf ac conf) x =
              word_gc_move_roots conf x
 Proof
   simp_tac std_ss [FORALL_PROD]
@@ -630,7 +633,7 @@ Proof
 QED
 
 Theorem word_gen_gc_move_roots_has_fp_ops[simp]:
-   !conf x. word_gen_gc_move_roots (conf with <| has_fp_ops := b1; has_fp_tern := b2 |>) x =
+   !conf x. word_gen_gc_move_roots (prepare_data_conf ac conf) x =
              word_gen_gc_move_roots conf x
 Proof
   simp_tac std_ss [FORALL_PROD]
@@ -640,7 +643,7 @@ Proof
 QED
 
 Theorem word_gen_gc_partial_move_roots_has_fp_ops[simp]:
-   !conf x. word_gen_gc_partial_move_roots (conf with <| has_fp_ops := b1; has_fp_tern := b2 |>) x =
+   !conf x. word_gen_gc_partial_move_roots (prepare_data_conf ac conf) x =
              word_gen_gc_partial_move_roots conf x
 Proof
   simp_tac std_ss [FORALL_PROD]
@@ -650,67 +653,73 @@ Proof
 QED
 
 Theorem word_gc_move_loop_has_fp_ops[simp]:
-   !n conf x. word_gc_move_loop n (conf with <| has_fp_ops := b1; has_fp_tern := b2 |>) x =
+   !n conf x. word_gc_move_loop n (prepare_data_conf ac conf) x =
                word_gc_move_loop n conf x
 Proof
   simp_tac std_ss [FORALL_PROD]
   \\ Induct \\ rw []
   \\ once_rewrite_tac [word_gc_move_loop_def] \\ fs []
-  \\ fs [ptr_to_addr_def,update_addr_def,small_shift_length_def,decode_length_def]
+  \\ fs [ptr_to_addr_def,update_addr_def,small_shift_length_def,decode_length_def,
+         prepare_data_conf_def]
 QED
 
 Theorem word_gen_gc_partial_move_data_has_fp_ops[simp]:
-   !n conf x. word_gen_gc_partial_move_data (conf with <| has_fp_ops := b1; has_fp_tern := b2 |>) n x =
+   !n conf x. word_gen_gc_partial_move_data (prepare_data_conf ac conf) n x =
                word_gen_gc_partial_move_data conf n x
 Proof
   simp_tac std_ss [FORALL_PROD]
   \\ Induct \\ rw []
   \\ once_rewrite_tac [word_gen_gc_partial_move_data_def] \\ fs []
-  \\ fs [ptr_to_addr_def,update_addr_def,small_shift_length_def,decode_length_def]
+  \\ fs [ptr_to_addr_def,update_addr_def,small_shift_length_def,decode_length_def,
+         prepare_data_conf_def]
 QED
 
 Theorem word_gen_gc_move_data_has_fp_ops[simp]:
-   !n conf x. word_gen_gc_move_data (conf with <| has_fp_ops := b1; has_fp_tern := b2 |>) n x =
+   !n conf x. word_gen_gc_move_data (prepare_data_conf ac conf) n x =
                word_gen_gc_move_data conf n x
 Proof
   simp_tac std_ss [FORALL_PROD]
   \\ Induct \\ rw []
   \\ once_rewrite_tac [word_gen_gc_move_data_def] \\ fs []
-  \\ fs [ptr_to_addr_def,update_addr_def,small_shift_length_def,decode_length_def]
+  \\ fs [ptr_to_addr_def,update_addr_def,small_shift_length_def,decode_length_def,
+         prepare_data_conf_def]
 QED
 
 Theorem word_gen_gc_move_refs_has_fp_ops[simp]:
-   !n conf x. word_gen_gc_move_refs (conf with <| has_fp_ops := b1; has_fp_tern := b2 |>) n x =
+   !n conf x. word_gen_gc_move_refs (prepare_data_conf ac conf) n x =
                word_gen_gc_move_refs conf n x
 Proof
   simp_tac std_ss [FORALL_PROD]
   \\ Induct \\ rw []
   \\ once_rewrite_tac [word_gen_gc_move_refs_def] \\ fs []
-  \\ fs [ptr_to_addr_def,update_addr_def,small_shift_length_def,decode_length_def]
+  \\ fs [ptr_to_addr_def,update_addr_def,small_shift_length_def,decode_length_def,
+         prepare_data_conf_def]
 QED
 
 Theorem word_gen_gc_partial_move_ref_list_has_fp_ops[simp]:
-   !n conf x. word_gen_gc_partial_move_ref_list n (conf with <| has_fp_ops := b1; has_fp_tern := b2 |>) x =
+   !n conf x. word_gen_gc_partial_move_ref_list n (prepare_data_conf ac conf) x =
                word_gen_gc_partial_move_ref_list n conf x
 Proof
   simp_tac std_ss [FORALL_PROD]
   \\ Induct \\ rw []
   \\ once_rewrite_tac [word_gen_gc_partial_move_ref_list_def] \\ fs []
-  \\ fs [ptr_to_addr_def,update_addr_def,small_shift_length_def,decode_length_def]
+  \\ fs [ptr_to_addr_def,update_addr_def,small_shift_length_def,decode_length_def,
+         prepare_data_conf_def]
 QED
 
 Theorem word_gen_gc_move_loop_has_fp_ops[simp]:
-   !n conf x. word_gen_gc_move_loop (conf with <| has_fp_ops := b1; has_fp_tern := b2 |>) n x =
+   !n conf x. word_gen_gc_move_loop (prepare_data_conf ac conf) n x =
                word_gen_gc_move_loop conf n x
 Proof
   simp_tac std_ss [FORALL_PROD]
   \\ Induct \\ rw []
   \\ once_rewrite_tac [word_gen_gc_move_loop_def] \\ fs []
-  \\ fs [ptr_to_addr_def,update_addr_def,small_shift_length_def,decode_length_def]
+  \\ fs [ptr_to_addr_def,update_addr_def,small_shift_length_def,decode_length_def,
+         prepare_data_conf_def]
 QED
 
 Theorem word_full_gc_has_fp_ops[simp]:
-   !x. word_full_gc (conf with <| has_fp_ops := b1; has_fp_tern := b2 |>) x =
+   !x. word_full_gc (prepare_data_conf ac conf) x =
         word_full_gc conf x
 Proof
   simp_tac std_ss [FORALL_PROD]
@@ -718,7 +727,7 @@ Proof
 QED
 
 Theorem word_gen_gc_partial_full_has_fp_ops[simp]:
-   !x. word_gen_gc_partial_full (conf with <| has_fp_ops := b1; has_fp_tern := b2 |>) x =
+   !x. word_gen_gc_partial_full (prepare_data_conf ac conf) x =
         word_gen_gc_partial_full conf x
 Proof
   simp_tac std_ss [FORALL_PROD]
@@ -727,7 +736,7 @@ Proof
 QED
 
 Theorem word_gen_gc_has_fp_ops[simp]:
-   !x. word_gen_gc (conf with <| has_fp_ops := b1; has_fp_tern := b2 |>) x =
+   !x. word_gen_gc (prepare_data_conf ac conf) x =
         word_gen_gc conf x
 Proof
   simp_tac std_ss [FORALL_PROD]
@@ -736,9 +745,9 @@ Proof
 QED
 
 Theorem word_gc_fun_has_fp_ops[simp]:
-   word_gc_fun (conf with <| has_fp_ops := b1; has_fp_tern := b2 |>) = word_gc_fun conf
+   word_gc_fun (prepare_data_conf ac conf) = word_gc_fun conf
 Proof
-  fs [word_gc_fun_def,FUN_EQ_THM,FORALL_PROD]
+  fs [prepare_data_conf_def,word_gc_fun_def,FUN_EQ_THM,FORALL_PROD]
   \\ Cases_on `conf.gc_kind` \\ fs []
 QED
 

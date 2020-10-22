@@ -686,6 +686,15 @@ val do_app_aux_def = Define `
                   (ByteArray f (REPLICATE (Num i) (i2w b))) s.refs|>)
             else Rerr (Rabort Rtype_error)
           | _ => Rerr (Rabort Rtype_error))
+    | (String strg, [RefPtr ptr]) =>
+        (case lookup ptr s.refs of
+         | SOME (ByteArray f bs) =>
+            (if LENGTH bs = LENGTH strg
+             then
+               Rval (Unit, s with refs := insert ptr
+                 (ByteArray f (MAP (n2w o ORD) strg)) s.refs)
+             else Error)
+         | _ => Error)
     | (Global n, _)      => Rerr (Rabort Rtype_error)
     | (SetGlobal n, _)   => Rerr (Rabort Rtype_error)
     | (AllocGlobal, _)   => Rerr (Rabort Rtype_error)

@@ -29,6 +29,7 @@ val _ = Datatype `
             ; has_longdiv : bool (* LongDiv available in target *)
             ; has_fp_ops : bool (* can compile floating-point ops *)
             ; has_fp_tern : bool (* can compile FMA *)
+            ; big_endian : bool (* byte representation *)
             ; call_empty_ffi : bool (* emit (T) / omit (F) calls to FFI "" *)
             ; gc_kind : gc_kind (* GC settings *) |>`
 
@@ -1188,6 +1189,54 @@ val def = assign_Define `
                    [adjust_var v1; adjust_var v2; 1] NONE) :'a wordLang$prog),l+1)
       : 'a wordLang$prog # num`;
 
+val byte_len_def = Define `
+  byte_len (:'a) num_bytes =
+    if dimindex (:'a) = 32 then num_bytes DIV 4 + 1
+                           else num_bytes DIV 8 + 1`;
+
+Definition set_byte_exec_def:
+   set_byte_exec (a:'a word) (b:word8) (w:'a word) is_bigendian =
+     let i = byte_index a is_bigendian DIV 8 in dtcase i of
+       | 0 => (w && ~(0xFFw <<  0)) || (w2w b <<  0)
+       | 1 => (w && ~(0xFFw <<  8)) || (w2w b <<  8)
+       | 2 => (w && ~(0xFFw << 16)) || (w2w b << 16)
+       | 3 => (w && ~(0xFFw << 24)) || (w2w b << 24)
+       | 4 => (w && ~(0xFFw << 32)) || (w2w b << 32)
+       | 5 => (w && ~(0xFFw << 40)) || (w2w b << 40)
+       | 6 => (w && ~(0xFFw << 48)) || (w2w b << 48)
+       | _ => (w && ~(0xFFw << 56)) || (w2w b << 56)
+End
+
+Definition bytes_to_word_exec_def:
+   bytes_to_word_exec 0 a bs w be = w /\
+   bytes_to_word_exec (SUC k) a [] w be = w /\
+   bytes_to_word_exec (SUC k) a (b::bs) w be = set_byte_exec a b
+      (bytes_to_word_exec k (a + 1w) bs w be) be
+End
+
+Definition write_bytes_def:
+   write_bytes bs [] be = [] ∧
+   write_bytes bs (w::ws) be:α word list =
+      let k = dimindex (:α) DIV 8 in
+      bytes_to_word_exec k 0w bs w be :: write_bytes (DROP k bs) ws be
+End
+
+val StoreEachWord_def = Define `
+  (StoreEachWord v1 v2 offset [] = Skip) /\
+  (StoreEachWord v1 v2 (offset:'a word) (x::xs) =
+     Seq (Seq (Assign v2 (Const x)) (Store (Op Add [Var v1; Const offset]) v2))
+         (StoreEachWord v1 v2 (offset + bytes_in_word) xs))`
+
+val def = assign_Define `
+  assign_String (c:data_to_word$config) (secn:num)
+                (l:num) (dest:num) (names:num_set option) strg v1:('a wordLang$prog # num) =
+      (Seq
+       (Seq (Assign 1 (real_addr c (adjust_var v1)))
+            (StoreEachWord 1 3 bytes_in_word
+              (write_bytes (MAP (\c. n2w (ORD c)) strg)
+                (REPLICATE (byte_len (:'a) (LENGTH strg)) 0w) c.big_endian)))
+       (Assign (adjust_var dest) Unit), l)`
+
 val def = assign_Define `
   assign_CopyByte (c:data_to_word$config) (secn:num)
              (l:num) (dest:num) (names:num_set option) args =
@@ -1989,6 +2038,7 @@ val assign_def = Define `
     | ConsExtend tag => assign_ConsExtend c secn l dest names tag args
     | Ref => assign_Ref c secn l dest names args
     | RefByte imm => arg2 args (assign_RefByte c secn l dest names imm) (Skip,l)
+    | String strg => arg1 args (assign_String c secn l dest names strg) (Skip,l)
     | Label n => (LocValue (adjust_var dest) n,l)
     | CopyByte alloc_new => assign_CopyByte c secn l dest names args
     | RefArray => arg2 args (assign_RefArray c secn l dest names) (Skip,l)
@@ -2281,11 +2331,15 @@ Proof
   EVAL_TAC
 QED
 
+val prepare_data_conf_def = Define `
+  prepare_data_conf asm_conf data_conf = data_conf with
+     <| has_fp_ops := (1 < asm_conf.fp_reg_count);
+        has_fp_tern := (asm_conf.ISA = ARMv7 /\ 2 < asm_conf.fp_reg_count);
+        big_endian := asm_conf.big_endian |>`
+
 val compile_def = Define `
   compile data_conf word_conf asm_conf prog =
-    let data_conf =
-      (data_conf with <| has_fp_ops := (1 < asm_conf.fp_reg_count);
-                      has_fp_tern := (asm_conf.ISA = ARMv7 /\ 2 < asm_conf.fp_reg_count) |>) in
+    let data_conf = prepare_data_conf asm_conf data_conf in
     let p = stubs (:α) data_conf ++ MAP (compile_part data_conf) prog in
       word_to_word$compile word_conf (asm_conf:'a asm_config) p`;
 

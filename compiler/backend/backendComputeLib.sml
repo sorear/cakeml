@@ -417,6 +417,13 @@ val add_backend_compset = computeLib.extend_compset
     ,data_to_wordTheory.encode_header_def
     ,data_to_wordTheory.list_Seq_def
     ,data_to_wordTheory.StoreEach_def
+    ,data_to_wordTheory.StoreEachWord_def
+    ,data_to_wordTheory.set_byte_exec_def
+    ,numLib.SUC_RULE data_to_wordTheory.bytes_to_word_exec_def
+    ,byteTheory.byte_index_def
+    ,data_to_wordTheory.write_bytes_def
+    ,data_to_wordTheory.byte_len_def
+    ,data_to_wordTheory.prepare_data_conf_def
     ,data_to_wordTheory.small_shift_length_def
     ,data_to_wordTheory.shift_length_def
     ,data_to_wordTheory.max_heap_limit_def
@@ -728,6 +735,7 @@ val add_backend_compset = computeLib.extend_compset
     ,word_to_stackTheory.write_bitmap_def
     ,word_to_stackTheory.insert_bitmap_def
     ,word_to_stackTheory.wLive_def
+    ,word_to_stackTheory.static_read_def
     ,word_to_stackTheory.SeqStackFree_def
     ,word_to_stackTheory.stack_arg_count_def
     ,word_to_stackTheory.stack_free_def

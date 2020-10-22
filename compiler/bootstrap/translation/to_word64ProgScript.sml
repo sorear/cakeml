@@ -96,9 +96,9 @@ val _ = translate (tag_mask_def |> conv64_RHS |> we_simp |> conv64_RHS |> SIMP_R
 
 val _ = translate (encode_header_def |> conv64_RHS)
 
-(* Manual inlines : shift_def, bytes_in_word because of 'a arg *)
+(* Manual inlines : shift_def, bytes_in_word, byte_len because of 'a arg *)
 val inline_simp =
-    SIMP_RULE std_ss [backend_commonTheory.word_shift_def,bytes_in_word_def];
+    SIMP_RULE std_ss [backend_commonTheory.word_shift_def,bytes_in_word_def,byte_len_def];
 
 val _ = register_type ``:64 wordLang$prog``;
 
@@ -118,6 +118,11 @@ val _ = translate (real_addr_def |> inline_simp |> conv64_RHS |> SIMP_RULE std_s
 val _ = translate (real_offset_def |> inline_simp |> conv64)
 val _ = translate (real_byte_offset_def |> inline_simp |> conv64)
 val _ = translate (GiveUp_def |> wcomp_simp |> conv64)
+val _ = translate (byte_index_def |> inline_simp |> conv64)
+val _ = translate (set_byte_exec_def |> inline_simp |> spec64 |> gconv)
+val _ = translate (bytes_to_word_exec_def |> inline_simp |> conv64)
+val _ = translate (write_bytes_def |> inline_simp |> conv64)
+val _ = translate (StoreEachWord_def |> inline_simp |> conv64)
 
 val _ = matches:= [``foo:'a wordLang$prog``,``foo:'a wordLang$exp``]
 
@@ -491,6 +496,7 @@ val _ = translate data_to_wordTheory.stub_names_def
 val _ = translate word_to_stackTheory.stub_names_def
 val _ = translate stack_allocTheory.stub_names_def
 val _ = translate stack_removeTheory.stub_names_def
+val _ = translate (data_to_wordTheory.prepare_data_conf_def |> conv64_RHS)
 val res = translate (data_to_wordTheory.compile_def
                      |> SIMP_RULE std_ss [data_to_wordTheory.stubs_def] |> conv64_RHS);
 

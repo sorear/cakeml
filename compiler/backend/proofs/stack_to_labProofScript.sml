@@ -3473,7 +3473,7 @@ QED
 
 Theorem full_make_init_has_fp_ops[simp]:
   full_make_init stack_conf wconf
-      (dconf with <| has_fp_ops := b1; has_fp_tern := b2 |>)
+      (prepare_data_conf ac dconf)
       mheap sp offset bitmaps code s save_regs dsp cor =
     full_make_init stack_conf wconf dconf
       mheap sp offset bitmaps code s save_regs dsp cor
