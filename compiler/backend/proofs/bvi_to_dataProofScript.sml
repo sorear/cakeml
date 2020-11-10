@@ -527,6 +527,9 @@ Proof
      \\ Cases_on `z`
      \\ rw [data_to_bvi_v_def,MAP_TAKE,MAP_DROP]
      \\ METIS_TAC [])
+  >- (Cases_on `z`
+      \\ fs[data_to_bvi_ref_def,lookup_insert]
+      \\ rw[Unit_def,bvlSemTheory.Unit_def,data_to_bvi_v_def,data_to_bvi_ref_def])
   >- (rw [data_to_bvi_ref_def] \\ rfs [refs_rel_LEAST_eq,lookup_map,map_replicate])
   >- (Cases_on `z` \\ fs [data_to_bvi_ref_def,data_to_bvi_v_def]
      \\ rfs [data_to_bvi_v_def,Unit_def,bvlSemTheory.Unit_def]

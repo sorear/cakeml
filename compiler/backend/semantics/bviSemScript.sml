@@ -82,6 +82,15 @@ val do_app_aux_def = Define `
     | (Global n, _) => NONE
     | (SetGlobal n, _) => NONE
     | (AllocGlobal, _) => NONE
+    | (String strg, [RefPtr ptr]) =>
+        (case FLOOKUP s.refs ptr of
+         | SOME (ByteArray f bs) =>
+            (if LENGTH bs = LENGTH strg
+             then
+               SOME (SOME (Unit, s with refs := s.refs |+
+                 (ptr, ByteArray f (MAP (n2w o ORD) strg))))
+             else NONE)
+         | _ => NONE)
     | (String _, _) => NONE
     | (FromListByte, _) => NONE
     | (ToListByte, _) => NONE
