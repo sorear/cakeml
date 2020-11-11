@@ -876,39 +876,6 @@ val compile_int_thm = Q.prove(
          (MATCH_MP DIVISION (DECIDE ``0 < 268435457:num``) |> Q.SPEC `n`)
     \\ intLib.COOPER_TAC));
 
-val compile_string_thm = Q.prove(
-  `∀str s ls vs.
-   FLOOKUP s.refs ptr = SOME (ByteArray T ls) ∧ LENGTH vs + LENGTH str = LENGTH ls ⇒
-   evaluate (MAPi (λn c. Op UpdateByte [Op (Const (&ORD c)) []; compile_int (&(n + LENGTH vs)); Var 0]) str,
-    RefPtr ptr::env, s) = (Rval (REPLICATE (LENGTH str) Unit),
-      s with refs := s.refs |+ (ptr, ByteArray T (TAKE (LENGTH vs) ls ++ (MAP (n2w o ORD) str))))`,
-  Induct \\ rw[evaluate_def,REPLICATE]
-  >- (rw[state_component_equality]
-      \\ match_mp_tac (GSYM FUPDATE_ELIM) \\ fs[FLOOKUP_DEF])
-  \\ rw[Once evaluate_CONS]
-  \\ reverse(rw[evaluate_def,do_app_def,do_app_aux_def,backend_commonTheory.small_enough_int_def])
-  >- ( qspec_then`h`strip_assume_tac ORD_BOUND \\ fs[] )
-  \\ reverse(rw[bvlSemTheory.do_app_def,compile_int_thm,EL_LENGTH_APPEND])
-  >- (
-    fs[] \\ first_x_assum(qspec_then`n2w (ORD h)`mp_tac)
-    \\ simp[w2n_n2w,ORD_BOUND] )
-  \\ simp[o_DEF,ADD1]
-  \\ simp[bvl_to_bvi_with_refs,bvl_to_bvi_id]
-  \\ qpat_abbrev_tac`ss = s with refs := _`
-  \\ first_x_assum(qspec_then`ss`mp_tac)
-  \\ simp[Abbr`ss`,FLOOKUP_UPDATE]
-  \\ disch_then(qspec_then`ARB::vs`mp_tac)
-  \\ rw[ADD1,state_component_equality]
-  \\ rw[fmap_eq_flookup,FLOOKUP_UPDATE] \\ rw[]
-  \\ rw[LIST_EQ_REWRITE]
-  \\ Cases_on`x = LENGTH vs` \\ simp[EL_APPEND1,EL_LUPDATE,EL_APPEND2,EL_TAKE]
-  \\ Cases_on`x < LENGTH vs` \\ simp[EL_APPEND1,EL_TAKE,EL_LUPDATE]
-  \\ simp[EL_TAKE,EL_APPEND2,o_DEF])
-  |> Q.SPECL[`str`,`s`,`ls`,`[]`]
-  |> SIMP_RULE(srw_ss())[]
-  |> Q.GENL[`str`,`ls`,`ptr`,`s`,`env`]
-  |> INST_TYPE[alpha|->``:'c``,beta|->``:'ffi``];
-
 Theorem HD_APPEND3:
    0 < LENGTH (l1 ++ l2) ⇒ HD (l1 ++ l2 ++ l3) = HD (l1 ++ l2)
 Proof
@@ -999,28 +966,12 @@ val iEval_bVarBound = Q.prove(
       \\ Cases_on `a` \\ fs [LENGTH_NIL]
       \\ fs [bviSemTheory.evaluate_def])
     \\ Cases_on`∃str. op = String str`
-    >- (
-      fs[] \\ fs[compile_op_def]
-      \\ once_rewrite_tac[bviSemTheory.evaluate_def]
-      \\ once_rewrite_tac[bviSemTheory.evaluate_def]
-      \\ once_rewrite_tac[bviSemTheory.evaluate_def]
-      \\ once_rewrite_tac[bviSemTheory.evaluate_def]
-      \\ simp[iEval_append]
-      \\ simp[compile_int_thm]
-      \\ first_x_assum(qspecl_then[`n`,`vs`]mp_tac) \\ fs[]
-      \\ CASE_TAC \\ fs[] \\ CASE_TAC \\ fs[]
-      \\ simp[do_app_def,do_app_aux_def,backend_commonTheory.small_enough_int_def,bvlSemTheory.do_app_def]
-      \\ IF_CASES_TAC \\ fs[] \\ pop_assum(SUBST_ALL_TAC o SYM)
-      \\ qmatch_goalsub_abbrev_tac`r.refs |+ (ptr,ByteArray T ls)`
-      \\ qpat_abbrev_tac`rr = r with refs := _`
-      \\ qspecl_then[`str`,`ls`,`ptr`,`rr`,`vs`]mp_tac compile_string_thm
-      \\ impl_tac >- simp[Abbr`ls`,Abbr`rr`,FLOOKUP_UPDATE,LENGTH_REPLICATE]
-      \\ simp[]
-      \\ qspecl_then[`str`,`ls`,`ptr`,`rr`,`vs++env`]mp_tac compile_string_thm
-      \\ impl_tac >- simp[Abbr`ls`,Abbr`rr`,FLOOKUP_UPDATE,LENGTH_REPLICATE]
-      \\ simp[]
-      \\ ntac 3 (disch_then kall_tac)
-      \\ simp[LENGTH_REPLICATE,Abbr`ls`,EL_APPEND1] )
+    >- (first_x_assum (qspecl_then[`n`,`vs`] assume_tac)
+        \\ rfs[]
+        \\ fs[compile_op_def,bviSemTheory.evaluate_def,do_app_def,do_app_aux_def,
+              backend_commonTheory.small_enough_int_def,compile_int_thm]
+        \\ Cases_on`evaluate (c1,vs,s)` \\ Cases_on`q`
+        \\ rw[FLOOKUP_UPDATE])
     \\ Cases_on`op = CopyByte T`
     >- (
       fs[compile_op_def]
@@ -1785,6 +1736,8 @@ val names_nss_DIV_nss = prove(
   fs [EVAL ``nss``,MULT_DIV]);
 
 fun note_tac s g = (print ("compile_exps_correct: " ^ s ^ "\n"); ALL_TAC g)
+
+val zero_is_small = Q.prove(`?w. 0 = w2n w`, qexists_tac`0w` >> simp[word_0_n2w])
 
 val compile_exps_correct = Q.prove(
   `!xs env s1 n res s2 (t1:('c,'ffi) bviSem$state) n2 ys aux b1.
@@ -2914,63 +2867,17 @@ val compile_exps_correct = Q.prove(
       \\ CONV_TAC SWAP_EXISTS_CONV \\ Q.EXISTS_TAC `b2'`
       \\ CONV_TAC SWAP_EXISTS_CONV \\ Q.EXISTS_TAC `c`
       \\ simp[adjust_bv_def,Abbr`b2'`,APPLY_UPDATE_THM]
-      \\ simp[iEvalOp_def,do_app_aux_def,bEvalOp_def,backend_commonTheory.small_enough_int_def]
-      \\ reverse IF_CASES_TAC \\ fs[]
-      >- (first_x_assum(qspec_then`0w`mp_tac) \\ simp[])
-      \\ qmatch_goalsub_abbrev_tac`RefPtr ptr'::MAP _ env,ss`
-      \\ qmatch_asmsub_abbrev_tac`ByteArray T ls`
-      \\ qspecl_then[`str`,`ls`,`ptr'`,`ss`,`MAP (adjust_bv b2) env`]mp_tac compile_string_thm
-      \\ impl_tac >- simp[Abbr`ss`,FLOOKUP_UPDATE,Abbr`ls`,LENGTH_REPLICATE]
-      \\ simp[] \\ disch_then kall_tac
-      \\ simp[LENGTH_REPLICATE,Abbr`ls`,EL_APPEND1,EL_APPEND2]
-      \\ qpat_x_assum`0 = _`(SUBST_ALL_TAC o SYM) \\ simp[]
+      \\ simp[iEvalOp_def,do_app_aux_def,bEvalOp_def,backend_commonTheory.small_enough_int_def,
+              zero_is_small,FLOOKUP_UPDATE]
       \\ reverse conj_tac
       >- (
         rw[Abbr`ptr`]
         \\ imp_res_tac evaluate_refs_SUBSET
         \\ fs[SUBSET_DEF]
         \\ res_tac \\ fs[LEAST_NOTIN_FDOM] )
-      \\ fs[state_rel_def,Abbr`ptr'`,Abbr`ss`]
-      \\ conj_tac
-      >- (
-        MATCH_MP_TAC INJ_EXTEND
-        \\ fs[Abbr`ptr`,LEAST_NOTIN_FDOM] )
-      \\ conj_tac
-      >- (
-        rw[FLOOKUP_UPDATE,APPLY_UPDATE_THM] \\ fs[]
-        >- (
-          CASE_TAC \\ fs[]
-          \\ fs[INJ_DEF,FLOOKUP_DEF]
-          \\ METIS_TAC[LEAST_NOTIN_FDOM] )
-        \\ qpat_x_assum`∀k. option_CASE _ _ _`(qspec_then`k`mp_tac)
-        \\ CASE_TAC \\ fs[]
-        \\ CASE_TAC \\ fs[] \\ rw[]
-        \\ imp_res_tac evaluate_ok
-        \\ fs[state_ok_def]
-        \\ first_x_assum(qspec_then`k`mp_tac) \\ rw[]
-        \\ simp[MAP_EQ_f] \\ rw[] \\ fs[EVERY_MEM]
-        \\ match_mp_tac (GEN_ALL bv_ok_IMP_adjust_bv_eq)
-        \\ qexists_tac `s5.refs`
-        \\ simp[APPLY_UPDATE_THM] \\ rw[]
-        \\ fs[Abbr`a`,LEAST_NOTIN_FDOM] )
-      \\ simp[FLOOKUP_UPDATE,APPLY_UPDATE_THM]
-      \\ ntac 2 strip_tac
-      \\ first_x_assum drule
-      \\ rw[]
-      >- ( simp[FLOOKUP_DEF,LEAST_NOTIN_FDOM] )
-      >- ( rw[] )
-      >> simp[o_DEF]
-      \\ qexists_tac`z` \\ simp[]
-      \\ simp[MAP_EQ_f]
-      \\ Cases \\ simp[libTheory.the_def]
-      \\ rw[]
-      \\ match_mp_tac (GEN_ALL bv_ok_IMP_adjust_bv_eq)
-      \\ qexists_tac `s5.refs`
-      \\ simp[APPLY_UPDATE_THM]
-      \\ imp_res_tac evaluate_ok
-      \\ fs[state_ok_def,EVERY_MEM]
-      \\ res_tac \\ fs[] \\ rw[]
-      \\ fs[Abbr`a`,LEAST_NOTIN_FDOM] )
+      \\ match_mp_tac state_rel_add_bytearray
+      \\ unabbrev_all_tac \\ fs[LEAST_NOTIN_FDOM]
+      \\ imp_res_tac evaluate_ok)
     \\ Cases_on`∃str. op = FromListByte` \\ fs[] >- (
       note_tac "Op: FromListByte" \\ fs[compile_op_def,bEvalOp_def]
       \\ `∃lv. REVERSE a = [lv]` by (every_case_tac \\ fs[]) \\ fs[]
