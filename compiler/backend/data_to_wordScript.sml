@@ -31,6 +31,7 @@ val _ = Datatype `
             ; has_fp_tern : bool (* can compile FMA *)
             ; big_endian : bool (* byte representation *)
             ; call_empty_ffi : bool (* emit (T) / omit (F) calls to FFI "" *)
+            ; strings : mlstring list (* strings collected by top-level *)
             ; gc_kind : gc_kind (* GC settings *) |>`
 
 val adjust_var_def = Define `
@@ -2336,6 +2337,14 @@ val prepare_data_conf_def = Define `
      <| has_fp_ops := (1 < asm_conf.fp_reg_count);
         has_fp_tern := (asm_conf.ISA = ARMv7 /\ 2 < asm_conf.fp_reg_count);
         big_endian := asm_conf.big_endian |>`
+
+Definition extract_strings_def:
+   extract_strings (prog:(num # num # dataLang$prog) list) = ([]:mlstring list)
+End
+
+Definition strings_to_rodata_def:
+   strings_to_rodata (strs:mlstring list) = ([]:'a word list)
+End
 
 val compile_def = Define `
   compile data_conf word_conf asm_conf prog =

@@ -62,6 +62,7 @@ val compile_tap_def = Define`
     let p = bvi_to_data$compile_prog p in
     let td = tap_data_lang c.tap_conf (p,names) td in
     let _ = empty_ffi (strlit "finished: bvi_to_data") in
+    let c = c with data_conf updated_by (λc. c with strings := extract_strings p) in
     let (col,p) = data_to_word$compile c.data_conf c.word_to_word_conf c.lab_conf.asm_conf p in
     let c = c with word_to_word_conf updated_by (λc. c with col_oracle := col) in
     let names = sptree$union (sptree$fromAList $ (data_to_word$stub_names () ++
@@ -69,7 +70,8 @@ val compile_tap_def = Define`
       stack_remove$stub_names ())) names in
     let td = tap_word c.tap_conf (p,names) td in
     let _ = empty_ffi (strlit "finished: data_to_word") in
-    let (c',fs,p) = word_to_stack$compile c.lab_conf.asm_conf [] p in
+    let (c',fs,p) = word_to_stack$compile c.lab_conf.asm_conf
+      (strings_to_rodata c.data_conf.strings) p in
     let td = tap_stack c.tap_conf (p,names) td in
     let c = c with word_conf := c' in
     let _ = empty_ffi (strlit "finished: word_to_stack") in
@@ -126,6 +128,7 @@ val to_data_def = Define`
 val to_word_def = Define`
   to_word c p =
   let (c,p,names) = to_data c p in
+  let c = c with data_conf updated_by (λc. c with strings := extract_strings p) in
   let (col,p) = data_to_word$compile c.data_conf c.word_to_word_conf c.lab_conf.asm_conf p in
   let c = c with word_to_word_conf updated_by (λc. c with col_oracle := col) in
   (c,p,names)`;
@@ -133,7 +136,8 @@ val to_word_def = Define`
 val to_stack_def = Define`
   to_stack c p =
   let (c,p,names) = to_word c p in
-  let (c',fs,p) = word_to_stack$compile c.lab_conf.asm_conf [] p in
+  let (c',fs,p) = word_to_stack$compile c.lab_conf.asm_conf
+    (strings_to_rodata c.data_conf.strings) p in
   let c = c with word_conf := c' in
   (c,p,names)`;
 
@@ -189,12 +193,14 @@ val from_stack_def = Define`
 
 val from_word_def = Define`
   from_word c names p =
-  let (c',fs,p) = word_to_stack$compile c.lab_conf.asm_conf [] p in
+  let (c',fs,p) = word_to_stack$compile c.lab_conf.asm_conf
+    (strings_to_rodata c.data_conf.strings) p in
   let c = c with word_conf := c' in
   from_stack c names p`;
 
 val from_data_def = Define`
   from_data c names p =
+  let c = c with data_conf updated_by (λc. c with strings := extract_strings p) in
   let (col,p) = data_to_word$compile c.data_conf c.word_to_word_conf c.lab_conf.asm_conf p in
   let c = c with word_to_word_conf updated_by (λc. c with col_oracle := col) in
   from_word c names p`;
@@ -251,6 +257,7 @@ QED
 val to_livesets_def = Define`
   to_livesets (c:α backend$config) p =
   let (c',p,names) = to_data c p in
+  let c = c with data_conf updated_by (λc. c with strings := extract_strings p) in
   let (data_conf,word_conf,asm_conf) = (c.data_conf,c.word_to_word_conf,c.lab_conf.asm_conf) in
   let data_conf = prepare_data_conf asm_conf data_conf in
   let p = stubs(:α) data_conf ++ MAP (compile_part data_conf) p in
@@ -270,7 +277,7 @@ val to_livesets_def = Define`
     let (heu_moves,spillcosts) = get_heuristics alg name_num prog in
     (get_clash_tree prog,heu_moves,spillcosts,get_forced c.lab_conf.asm_conf prog [])) p
   in
-    ((reg_count,data),c',names,p)`
+    ((reg_count,data),c' with data_conf:=c.data_conf,names,p)`
 
 val from_livesets_def = Define`
   from_livesets c ((k,data),c',names,p) =
@@ -294,7 +301,7 @@ val from_livesets_def = Define`
      that won't be read from this point. *)
   let c = c with word_to_word_conf updated_by (λc. c with col_oracle := col) in
   let c = c with <| source_conf := c'.source_conf; clos_conf := c'.clos_conf;
-        bvl_conf := c'.bvl_conf |> in
+        bvl_conf := c'.bvl_conf; data_conf := c'.data_conf |> in
   from_word c names p`;
 
 Theorem compile_oracle:

@@ -485,7 +485,8 @@ val cake_orac_config_inv_f =
   ``(\(cc, bc, mc). (cc.max_app, cc.do_call, IS_SOME cc.known_conf,
         known_static_conf cc.known_conf, cc.do_mti, bc.inline_size_limit,
         bc.split_main_at_seq, bc.exp_cut, mc))
-    o (\c. (c.clos_conf, c.bvl_conf, c.data_conf,
+    o (\c. (c.clos_conf, c.bvl_conf,
+        c.data_conf.has_div, c.data_conf.has_longdiv,
         c.word_to_word_conf.reg_alg, c.stack_conf, c.lab_conf.asm_conf))``
 
 val cake_orac_config_tuple_eq_step = ISPEC cake_orac_config_inv_f cake_configs_eq
@@ -495,6 +496,14 @@ val orac_eq_prop = let
     val m = match_term ``A /\ B /\ C ==> P``
         (concl cake_orac_config_tuple_eq_step)
   in subst (fst m) ``A ==> P`` end;
+
+Theorem cake_orac_data_conf_eq:
+  compile c prog = SOME (b,bm,c') ==> (cake_configs c' src x).data_conf = c'.data_conf
+Proof
+  Induct_on`x`
+  \\ fs[cake_configs_def,state_orac_states_def,compile_inc_progs_def]
+  \\ rpt (pairarg_tac >> rw[])
+QED
 
 Theorem cake_orac_config_eqs:
   ^orac_eq_prop
@@ -597,7 +606,7 @@ Theorem cake_orac_eqs:
   cake_orac c' src f3 (\ps. ps.data_prog)
   /\ (
   compile c prog = SOME (b,bm,c') /\
-    dc = prepare_data_conf c.lab_conf.asm_conf c.data_conf /\
+    dc = prepare_data_conf c.lab_conf.asm_conf c'.data_conf /\
     tr_c = c.lab_conf.asm_conf.two_reg_arith /\
     reg_c = c.lab_conf.asm_conf.reg_count -
         (LENGTH c.lab_conf.asm_conf.avoid_regs + 5) /\
@@ -637,6 +646,7 @@ Proof
   \\ rveq \\ fs []
   (* assumption-free goals need to be proven by now *)
   \\ drule_then assume_tac cake_orac_config_eqs
+  \\ drule_then assume_tac cake_orac_data_conf_eq
   \\ fs []
   >- (
     fs [clos_to_bvl_compile_inc_def,
@@ -647,7 +657,6 @@ Proof
   >- (
     fs [bvl_to_bvi_compile_inc_all_def, config_tuple2_def]
     \\ rpt (pairarg_tac \\ fs [])
-    \\ rveq \\ fs []
   )
 QED
 
@@ -706,7 +715,8 @@ QED
 
 Theorem from_data_conf_EX:
   from_data c names p = v ==>
-  ?wcu p. from_word (c with word_to_word_conf updated_by wcu) names p = v
+  ?wcu dcu p. from_word (c with <| data_conf updated_by dcu;
+    word_to_word_conf updated_by wcu |>) names p = v
 Proof
   fs [from_data_def]
   \\ pairarg_tac \\ fs []
@@ -1485,7 +1495,7 @@ Proof
   rw [to_word_def]
   \\ rpt (pairarg_tac \\ fs [])
   \\ rveq \\ fs []
-  \\ qpat_x_assum `compile _.data_conf _ _ _ = _` mp_tac
+  \\ qpat_x_assum `compile (_ _.data_conf) _ _ _ = _` mp_tac
   \\ (data_to_word_compile_lab_pres
      |> Q.GENL[`data_conf`,`word_conf`,`asm_conf`,`prog`]
      |> C (specl_args_of_then``data_to_word$compile``)mp_tac)
@@ -1510,7 +1520,8 @@ Proof
   \\ drule to_word_labels_ok
   \\ simp []
   \\ rename [`to_word c prog = (word_c, word_p, word_n)`]
-  \\ qspecl_then [`word_p`, `word_c.lab_conf.asm_conf`, ‘[]’] mp_tac
+  \\ qmatch_assum_abbrev_tac`word_to_stack$compile _ rodata _ = (_,_,_)`
+  \\ qspecl_then [`word_p`, `word_c.lab_conf.asm_conf`, `rodata`] mp_tac
     (Q.GENL [‘prog’, ‘asm_cognf’, ‘static_data’] word_to_stack_compile_lab_pres)
   \\ simp []
   \\ rpt disch_tac
@@ -1804,12 +1815,12 @@ Proof
     \\ disch_tac
     \\ rpt (pairarg_tac \\ fs [])
     \\ rveq \\ fs []
-    \\ rename [`compile c2.lab_conf.asm_conf [] word_p = _`]
-    \\ qspecl_then [‘[]’, `word_p`, `c2.lab_conf.asm_conf`] mp_tac
+    \\ rename [`compile c2.lab_conf.asm_conf rodata word_p = _`]
+    \\ qspecl_then [‘rodata’, `word_p`, `c2.lab_conf.asm_conf`] mp_tac
         (GEN_ALL word_to_stack_compile_lab_pres)
     \\ simp [EVAL ``raise_stub_location < SUC data_num_stubs``]
     \\ disch_tac
-    \\ qpat_x_assum `compile _.data_conf _ _ _ = _` mp_tac
+    \\ qpat_x_assum `compile (_ _.data_conf) _ _ _ = _` mp_tac
     \\ (data_to_word_compile_lab_pres
        |> Q.GENL[`data_conf`,`word_conf`,`asm_conf`,`prog`]
        |> C (specl_args_of_then``data_to_word$compile``)mp_tac)
@@ -2139,7 +2150,8 @@ Proof
       \\ simp[data_to_wordTheory.compile_part_def]
       \\ simp[PULL_EXISTS] \\ rw[]
       \\ irule data_to_wordProofTheory.comp_no_inst
-      \\ EVAL_TAC
+      \\ simp[data_to_wordTheory.prepare_data_conf_def]
+      \\ drule_then (fn t => rfs [t]) cake_orac_config_eqs
       \\ fs[backend_config_ok_def, asmTheory.offset_ok_def]
       \\ pairarg_tac \\ fs[]
       \\ pairarg_tac \\ fs[]
@@ -2241,6 +2253,7 @@ Proof
     \\ simp[data_to_wordTheory.compile_part_def]
     \\ simp[PULL_EXISTS] \\ rw[]
     \\ irule data_to_wordProofTheory.comp_no_inst
+    \\ simp [data_to_wordTheory.prepare_data_conf_def]
     \\ drule_then (fn t => simp [t]) cake_orac_config_eqs
     \\ fs[backend_config_ok_def, asmTheory.offset_ok_def,
           data_to_wordTheory.prepare_data_conf_def]
@@ -2306,8 +2319,8 @@ Proof
 QED
 
 Theorem to_lab_good_code_lemma:
-  compile c.stack_conf word_to_stack_conf c.data_conf lim1 lim2 offs stack_prog = code /\
-  compile asm_conf3 [] word_prog = (wc, fs, stack_prog) /\
+  compile c_stack_conf word_to_stack_conf c_data_conf lim1 lim2 offs stack_prog = code /\
+  compile asm_conf3 rodata word_prog = (wc, fs, stack_prog) /\
   compile data_conf word_conf asm_conf2 data_prog = (col, word_prog) /\
   stack_to_labProof$labels_ok code /\
   all_enc_ok_pre conf code
@@ -2590,6 +2603,30 @@ Proof
   drule stackPropsTheory.evaluate_consts >> simp[]
 QED
 
+(* TODO MOVE *)
+Theorem conf_ok_strings:
+   conf_ok (:'a) (c with strings := x) <=> conf_ok (:'a) c
+Proof
+   simp[data_to_wordTheory.conf_ok_def,data_to_wordTheory.shift_length_def]
+QED
+
+Theorem compile_word_to_stack_rodata:
+   word_to_stack$compile c (ro:α word list) p = (c2,p2) ∧
+   (word_list (ptr:α word) (MAP Word c2.bitmaps) * frame) (fun2set (m,dm)) ∧
+   good_dimindex (:α) ⇒
+   isPREFIX ro (DROP (w2n c2.static_offset) c2.bitmaps)
+Proof
+   rpt strip_tac
+   \\ drule data_to_word_gcProofTheory.word_list_IMP_limit
+   \\ rw[]
+   \\ fs[word_to_stackTheory.compile_def]
+   \\ rpt (pairarg_tac \\ fs[]) \\ rveq \\ fs[]
+   \\ `LENGTH bitmaps MOD dimword (:α) = LENGTH bitmaps` suffices_by simp[DROP_LENGTH_APPEND]
+   \\ match_mp_tac LESS_MOD
+   \\ fs[labPropsTheory.good_dimindex_def]
+   \\ rfs[dimword_def]
+QED
+
 Theorem compile_correct':
 
   compile (c:'a config) prog = SOME (bytes,bitmaps,c') ⇒
@@ -2695,7 +2732,7 @@ Proof
                             cfg (MAP (λp. full_compile_single mc.target.config.two_reg_arith (mc.target.config.reg_count - (LENGTH mc.target.config.avoid_regs + 5))
                             c.word_to_word_conf.reg_alg
                             (mc:('a,'b,'c)machine_config).target.config (p,NONE)) progs)) o
-                            MAP (compile_part (prepare_data_conf mc.target.config c.data_conf))))))``
+                            MAP (compile_part (prepare_data_conf mc.target.config (c':'a config).data_conf))))))``
      |> ISPEC)
    |> Q.GEN`co`
    |> Q.GEN`c`
@@ -2788,8 +2825,8 @@ Proof
   \\ strip_tac
   \\ rename1`compile _ _ _ p4 = (col,p5)` \\
 
-  qhdtm_x_assum`from_word`mp_tac \\
-  simp[from_word_def] \\ pairarg_tac \\ fs[] \\ strip_tac \\
+qhdtm_x_assum`from_word`mp_tac \\
+simp[from_word_def] \\ pairarg_tac \\ fs[] \\ strip_tac \\
 
   qmatch_goalsub_abbrev_tac`cake_orac _ orac_syntax _ (\ps. ps.bvi_prog)` \\
   simp [simple_orac_eqs] \\
@@ -2815,7 +2852,8 @@ Proof
   strip_tac \\
   qabbrev_tac`kkk = stk - 2`>>
   qmatch_goalsub_abbrev_tac`dataSem$semantics _ _ data_oracle` \\
-  qabbrev_tac `c4_data_conf = prepare_data_conf c4.lab_conf.asm_conf c4.data_conf` \\
+  qabbrev_tac`c4_data_conf_s = (c4.data_conf with strings := extract_strings p4)` \\
+  qabbrev_tac `c4_data_conf = prepare_data_conf c4.lab_conf.asm_conf c4_data_conf_s` \\
   qabbrev_tac`lab_st:('a,'a lab_to_target$config,'ffi) labSem$state = lab_to_targetProof$make_init mc ffi io_regs cc_regs tar_st m (dm ∩ byte_aligned) ms p7 lab_to_target$compile
        (mc.target.get_pc ms + n2w (LENGTH bytes)) cbspace lab_oracle` \\
 
@@ -2823,7 +2861,7 @@ Proof
     stack_to_labProof$full_make_init
       c4.stack_conf
       c6
-      c4.data_conf
+      c4_data_conf_s
       (2 * max_heap_limit (:'a) c4_data_conf - 1)
       stk
       stoff
@@ -2834,7 +2872,8 @@ Proof
       data_sp
       stack_oracle` >>
   qabbrev_tac`stack_st = FST stack_st_opt` >>
-  qabbrev_tac`word_st = word_to_stackProof$make_init kkk stack_st (fromAList p5) [] word_oracle` \\
+  qabbrev_tac`rodata = strings_to_rodata (extract_strings p4)` >>
+  qabbrev_tac`word_st = word_to_stackProof$make_init kkk stack_st (fromAList p5) rodata word_oracle` \\
 
   rewrite_tac [is_safe_for_space_def] \\
   `FST(SND(to_data c prog)) = p4 /\ FST(SND(to_word c prog)) = p5` by
@@ -2861,9 +2900,9 @@ Proof
   \\ ntac 2 strip_tac
   \\ FULL_SIMP_TAC std_ss [Once LET_THM]>>
   imp_res_tac (word_to_stack_compile_lab_pres |> INST_TYPE [beta|->alpha])>>
-  pop_assum (qspecl_then[‘[]’,`c4.lab_conf.asm_conf`] assume_tac)>>fs[]>>
+  pop_assum (qspecl_then[‘rodata’,`c4.lab_conf.asm_conf`] assume_tac)>>fs[]>>
   rfs[]>>
-  (word_to_stack_stack_asm_convs |> GEN_ALL |> Q.SPECL_THEN[‘[]’,`p5`,`c4.lab_conf.asm_conf`] mp_tac)>>
+  (word_to_stack_stack_asm_convs |> GEN_ALL |> Q.SPECL_THEN[‘rodata’,`p5`,`c4.lab_conf.asm_conf`] mp_tac)>>
   impl_tac>-
     (fs[Abbr`c4`,EVERY_MEM,FORALL_PROD]>>
      unabbrev_all_tac \\ fs[] >>
@@ -2889,7 +2928,7 @@ Proof
   \\ old_drule clos_to_bvlProofTheory.compile_all_distinct_locs
   \\ strip_tac
   \\ disch_then(qspec_then`0`mp_tac) \\ simp[] \\ strip_tac
-  \\ `stubs (:'a) c4.data_conf = stubs (:'a) c4_data_conf` by ( simp[Abbr`c4_data_conf`] )
+  \\ `stubs (:'a) c4_data_conf_s = stubs (:'a) c4_data_conf` by ( simp[Abbr`c4_data_conf`] )
   \\ qmatch_assum_rename_tac`_ _ code = (n2,p3)`
   \\ `MAP FST p4 = MAP FST p3`
     by metis_tac[bvi_to_dataProofTheory.MAP_FST_compile_prog]
@@ -2923,7 +2962,8 @@ Proof
   `all_enc_ok_pre c4.lab_conf.asm_conf p7` by (
     fs[Abbr`p7`,Abbr`stoff`,Abbr`stk`]>>
     match_mp_tac stack_to_lab_compile_all_enc_ok>>
-    fs[stackPropsTheory.reg_name_def,Abbr`c4`,mc_conf_ok_def]>>
+    fs[stackPropsTheory.reg_name_def,Abbr`c4`,mc_conf_ok_def,
+       Abbr`c4_data_conf_s`,conf_ok_strings]>>
     unabbrev_all_tac >>
     fs[EVERY_MEM,MEM_MAP,PULL_EXISTS,FORALL_PROD]>>rfs[]>>
     `-8w ≤ 0w:'a word ∧ 0w:'a word ≤ 8w` by
@@ -2957,8 +2997,8 @@ Proof
     \\ rpt (pairarg_tac \\ fs []))
 
   \\ impl_tac >- (
-    simp[Abbr`word_st`,word_to_stackProofTheory.make_init_def,Abbr`c4`,Abbr`c4_data_conf`,
-         EVAL ``wordSem$stack_size []``]
+    simp[Abbr`word_st`,word_to_stackProofTheory.make_init_def,Abbr`c4`,
+         Abbr`c4_data_conf`,EVAL ``wordSem$stack_size []``]
     (*
     qmatch_goalsub_rename_tac`c5.data_conf` \\ qunabbrev_tac`c5` \\
     *)
@@ -2976,7 +3016,9 @@ Proof
     fs[Abbr`word_oracle`,Abbr`t_code`,domain_fromAList]>>
     conj_tac
     >- fs [data_to_wordTheory.conf_ok_def,
-           data_to_wordTheory.shift_length_def] \\
+           data_to_wordTheory.shift_length_def,
+           data_to_wordTheory.prepare_data_conf_def,
+           Abbr`c4_data_conf_s`] \\
     conj_tac >- simp[full_make_init_be,make_init_def,data_to_wordTheory.prepare_data_conf_def] \\
     CONJ_TAC>- (
       fs[Abbr`data_oracle`,full_co_def]
@@ -3083,7 +3125,9 @@ Proof
     fs[Abbr`lab_st`,make_init_def] \\
     fs[mc_init_ok_def, mc_conf_ok_def, Abbr`stk`,byte_aligned_MOD] \\
     `max_heap_limit (:'a) c4_data_conf = max_heap_limit (:'a) c.data_conf` by
-      (simp[Abbr`c4_data_conf`] \\ EVAL_TAC) \\
+      (simp[Abbr`c4_data_conf`,Abbr`c4_data_conf_s`] \\ EVAL_TAC) \\
+    `max_heap_limit (:'a) c4_data_conf_s = max_heap_limit (:'a) c.data_conf` by
+      (simp[Abbr`c4_data_conf_s`] \\ EVAL_TAC) \\
     rewrite_tac [GSYM CONJ_ASSOC] \\
     conj_tac >- fs[Abbr`p7`] \\
     conj_tac >- (
@@ -3195,7 +3239,8 @@ Proof
      \\ simp [dataSemTheory.limits_component_equality]
      \\ fs [data_to_wordProofTheory.get_limits_def]
      \\ simp [dataSemTheory.compute_limits_def,is_64_bits_def]
-     \\ qunabbrev_tac `c4_data_conf` \\ simp []
+     \\ qunabbrev_tac `c4_data_conf` \\ qunabbrev_tac `c4_data_conf_s`
+     \\ simp [data_to_wordTheory.prepare_data_conf_def]
      \\ simp [word_to_stackProofTheory.make_init_def,DOMSUB_FAPPLY_THM]
      \\ fs [stack_to_labProofTheory.full_make_init_def]
      \\ Cases_on `r` \\ fs []
@@ -3288,7 +3333,8 @@ Proof
     \\ fs[Abbr`kkk`,Abbr`stk`,Abbr`stack_st`] \\ rfs[]
     \\ qmatch_goalsub_abbrev_tac`dataSem$semantics _ _ _ foo1`
     \\ qmatch_asmsub_abbrev_tac`dataSem$semantics _ _ _ foo2`
-    \\ `c4_data_conf.gc_kind = c.data_conf.gc_kind` by fs [Abbr`c4_data_conf`]
+    \\ `c4_data_conf.gc_kind = c.data_conf.gc_kind` by
+       fs [Abbr`c4_data_conf`,Abbr`c4_data_conf_s`]
     \\ fs []
     \\ `foo1 = foo2` suffices_by
       (qpat_x_assum `z InitGlobals_location IN _` mp_tac
@@ -3310,12 +3356,13 @@ Proof
   qunabbrev_tac `start_tmp` \\
   conj_tac THEN1
    (qpat_x_assum `dataSem$data_lang_safe_for_space _ _ _ _ _ /\ _ ==> _` mp_tac
-    \\ `c4_data_conf.gc_kind = c.data_conf.gc_kind` by fs [Abbr`c4_data_conf`]
+    \\ `c4_data_conf.gc_kind = c.data_conf.gc_kind` by
+       fs [Abbr`c4_data_conf`,Abbr`c4_data_conf_s`]
     \\ simp []) \\
 
   (word_to_stackProofTheory.compile_semantics
    |> Q.GENL[‘k’,‘coracle’,`t`,`code`,‘static_data’,`asm_conf`,`start`]
-   |> Q.ISPECL_THEN[`kkk`,`word_oracle`,`stack_st`,`p5`,‘[]:'a word list’,`c.lab_conf.asm_conf`,`InitGlobals_location`]mp_tac) \\
+   |> Q.ISPECL_THEN[`kkk`,`word_oracle`,`stack_st`,`p5`,`rodata`,`c.lab_conf.asm_conf`,`InitGlobals_location`]mp_tac) \\
 
   impl_tac >- (
     rename [`rrr <> NONE`] \\ Cases_on `rrr` \\ fs [] \\
@@ -3333,6 +3380,10 @@ Proof
       fs[mc_conf_ok_def,backend_config_ok_def,Abbr`stack_st`] >>
       old_drule compile_word_to_stack_bitmaps>>
       CASE_TAC>>strip_tac>>
+      conj_tac>-(
+        drule compile_word_to_stack_rodata >> fs[] >>
+        disch_then drule >> simp[]
+      )>>
       reverse conj_tac >- (
         simp [Abbr `stack_oracle`, Abbr `word_oracle`]
         \\ drule_then (fn t => simp [GSYM t]) word_to_stack_orac_eq

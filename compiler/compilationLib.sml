@@ -193,6 +193,7 @@ fun compile_to_lab data_prog_def to_data_thm lab_prog_name =
       |> (REWR_CONV to_livesets_def THENC
           RAND_CONV (REWR_CONV to_data_thm) THENC
           REWR_CONV LET_THM THENC PAIRED_BETA_CONV THENC
+          REWR_CONV LET_THM THENC BETA_CONV THENC
           REWR_CONV LET_THM THENC PAIRED_BETA_CONV THENC
           REWR_CONV LET_THM THENC BETA_CONV THENC
           REWR_CONV_BETA LET_THM THENC

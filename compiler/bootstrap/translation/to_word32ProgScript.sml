@@ -497,6 +497,8 @@ val _ = translate word_to_stackTheory.stub_names_def
 val _ = translate stack_allocTheory.stub_names_def
 val _ = translate stack_removeTheory.stub_names_def
 val _ = translate (data_to_wordTheory.prepare_data_conf_def |> conv32_RHS)
+val _ = translate (data_to_wordTheory.extract_strings_def |> conv32_RHS)
+val _ = translate (data_to_wordTheory.strings_to_rodata_def |> conv32_RHS)
 val res = translate (data_to_wordTheory.compile_def
                      |> SIMP_RULE std_ss [data_to_wordTheory.stubs_def] |> conv32_RHS);
 

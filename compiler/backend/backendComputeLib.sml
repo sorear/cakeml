@@ -424,6 +424,8 @@ val add_backend_compset = computeLib.extend_compset
     ,data_to_wordTheory.write_bytes_def
     ,data_to_wordTheory.byte_len_def
     ,data_to_wordTheory.prepare_data_conf_def
+    ,data_to_wordTheory.extract_strings_def
+    ,data_to_wordTheory.strings_to_rodata_def
     ,data_to_wordTheory.small_shift_length_def
     ,data_to_wordTheory.shift_length_def
     ,data_to_wordTheory.max_heap_limit_def
