@@ -71,7 +71,7 @@ val compile_tap_def = Define`
     let td = tap_word c.tap_conf (p,names) td in
     let _ = empty_ffi (strlit "finished: data_to_word") in
     let (c',fs,p) = word_to_stack$compile c.lab_conf.asm_conf
-      (strings_to_rodata c.data_conf.strings) p in
+      (strings_to_rodata c.lab_conf.asm_conf.big_endian c.data_conf.strings) p in
     let td = tap_stack c.tap_conf (p,names) td in
     let c = c with word_conf := c' in
     let _ = empty_ffi (strlit "finished: word_to_stack") in
@@ -137,7 +137,7 @@ val to_stack_def = Define`
   to_stack c p =
   let (c,p,names) = to_word c p in
   let (c',fs,p) = word_to_stack$compile c.lab_conf.asm_conf
-    (strings_to_rodata c.data_conf.strings) p in
+    (strings_to_rodata c.lab_conf.asm_conf.big_endian c.data_conf.strings) p in
   let c = c with word_conf := c' in
   (c,p,names)`;
 
@@ -194,7 +194,7 @@ val from_stack_def = Define`
 val from_word_def = Define`
   from_word c names p =
   let (c',fs,p) = word_to_stack$compile c.lab_conf.asm_conf
-    (strings_to_rodata c.data_conf.strings) p in
+    (strings_to_rodata c.lab_conf.asm_conf.big_endian c.data_conf.strings) p in
   let c = c with word_conf := c' in
   from_stack c names p`;
 

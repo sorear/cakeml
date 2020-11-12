@@ -48,6 +48,7 @@ val op_space_reset_def = Define `
   (op_space_reset (FromList _) = T) /\
   (op_space_reset RefArray = T) /\
   (op_space_reset (RefByte _) = T) /\
+  (op_space_reset (String _) = T) /\
   (op_space_reset (ConsExtend _) = T) /\
   (op_space_reset (CopyByte new_flag) = new_flag) /\
   (op_space_reset ConfigGC = T) /\
@@ -57,6 +58,7 @@ val op_space_reset_def = Define `
 val op_requires_names_def = Define`
   op_requires_names op = (op_space_reset op ∨ (∃n. op = FFI n) ∨
                          (∃new_flag. op = CopyByte new_flag) ∨
+                         (∃strg. op = String strg) ∨
                          (op = Install))`;
 
 val _ = Datatype `

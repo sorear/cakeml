@@ -300,6 +300,8 @@ Definition stack_consumed_def:
     OPTION_MAP2 MAX
      (lookup RefByte_location sfs)
      (lookup Replicate_location sfs)) /\
+  (stack_consumed sfs lims (String _) vs =
+    lookup StringLitLoop_location sfs) /\
   (stack_consumed sfs lims (RefArray) vs =
     OPTION_MAP2 MAX
      (lookup RefArray_location sfs)

@@ -247,6 +247,7 @@ val state_rel_def = Define `
     t0.handler = t.handler /\
     t0.termdep = t.termdep /\
     t0.code = t.code /\
+    t0.rodata = t.rodata /\
     t0.be = t.be /\
     t0.ffi = t.ffi /\
     t0.compile = t.compile /\

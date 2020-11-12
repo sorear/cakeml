@@ -4406,6 +4406,10 @@ End
 
 val s = ``(s:('c,'ffi) dataSem$state)``
 
+Definition strings_ok_def:
+  strings_ok strings <=> ?prog. strings = extract_strings prog
+End
+
 val state_rel_thm = Define `
   state_rel c l1 l2 ^s (t:('a,'c,'ffi) wordSem$state) v1 locs <=>
     (* I/O, clock and handler are the same, GC is fixed, code is compiled *)
@@ -4419,6 +4423,8 @@ val state_rel_thm = Define `
     good_dimindex (:'a) /\
     shift_length c < dimindex (:'a) /\
     c.big_endian = t.be /\
+    t.rodata = strings_to_rodata t.be c.strings /\
+    strings_ok c.strings /\
     IS_SOME s.tstamps /\
     (* the store *)
     EVERY (\n. n IN FDOM t.store) [Globals] /\
@@ -4511,6 +4517,7 @@ Theorem state_rel_init:
     lim.has_fp_tops = c.has_fp_tern /\
     conf_ok (:'a) c /\
     c.big_endian = t.be /\
+    strings_ok c.strings /\ t.rodata = strings_to_rodata t.be c.strings /\
     init_store_ok c t.store t.memory t.mdomain t.code_buffer t.data_buffer ==>
     state_rel c l1 l2 (initial_state ffi code co cc T lim t.stack_size t.clock)
                       (t:('a,'c,'ffi) state) [] []

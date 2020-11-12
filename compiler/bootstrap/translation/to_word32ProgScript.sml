@@ -123,6 +123,8 @@ val _ = translate (set_byte_exec_def |> inline_simp |> spec32 |> gconv)
 val _ = translate (bytes_to_word_exec_def |> inline_simp |> conv32)
 val _ = translate (write_bytes_def |> inline_simp |> conv32)
 val _ = translate (StoreEachWord_def |> inline_simp |> conv32)
+val _ = save_thm ("extracted_string_ind",data_to_wordTheory.extracted_string_ind |> inline_simp |> conv32)
+val _ = translate (data_to_wordTheory.extracted_string_def |> inline_simp |> conv32)
 
 val _ = matches:= [``foo:'a wordLang$prog``,``foo:'a wordLang$exp``]
 
@@ -458,6 +460,7 @@ val _ = translate(WriteLastBytes_def |> conv32)
 val _ = translate(RefByte_code_def |> inline_simp |> conv32 |> SIMP_RULE std_ss[SmallLsr_def])
 val _ = translate(RefArray_code_def |> inline_simp |> conv32|>econv)
 val _ = translate(Replicate_code_def|> inline_simp |> conv32)
+val _ = translate(StringLitLoop_code_def|> inline_simp |> conv32)
 val _ = translate(AddNumSize_def|> conv32)
 val _ = translate(AnyHeader_def|> inline_simp |> conv32)
 val _ = translate(AnyArith_code_def|> inline_simp |> conv32)
@@ -497,8 +500,10 @@ val _ = translate word_to_stackTheory.stub_names_def
 val _ = translate stack_allocTheory.stub_names_def
 val _ = translate stack_removeTheory.stub_names_def
 val _ = translate (data_to_wordTheory.prepare_data_conf_def |> conv32_RHS)
-val _ = translate (data_to_wordTheory.extract_strings_def |> conv32_RHS)
-val _ = translate (data_to_wordTheory.strings_to_rodata_def |> conv32_RHS)
+val _ = translate (data_to_wordTheory.extract_strings_prog_def |>
+                   SIMP_RULE std_ss [DROP_EQ_NIL] |> conv32)
+val _ = translate (data_to_wordTheory.extract_strings_def |> conv32)
+val _ = translate (data_to_wordTheory.strings_to_rodata_def |> inline_simp |> conv32)
 val res = translate (data_to_wordTheory.compile_def
                      |> SIMP_RULE std_ss [data_to_wordTheory.stubs_def] |> conv32_RHS);
 

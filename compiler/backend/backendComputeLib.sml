@@ -424,7 +424,9 @@ val add_backend_compset = computeLib.extend_compset
     ,data_to_wordTheory.write_bytes_def
     ,data_to_wordTheory.byte_len_def
     ,data_to_wordTheory.prepare_data_conf_def
+    ,data_to_wordTheory.extract_strings_prog_dtcase
     ,data_to_wordTheory.extract_strings_def
+    ,data_to_wordTheory.extracted_string_def
     ,data_to_wordTheory.strings_to_rodata_def
     ,data_to_wordTheory.small_shift_length_def
     ,data_to_wordTheory.shift_length_def
@@ -441,6 +443,7 @@ val add_backend_compset = computeLib.extend_compset
     ,data_to_wordTheory.RefByte_location_eq
     ,data_to_wordTheory.RefArray_location_eq
     ,data_to_wordTheory.Replicate_location_eq
+    ,data_to_wordTheory.StringLitLoop_location_eq
     ,data_to_wordTheory.AnyArith_location_eq
     ,data_to_wordTheory.Add_location_eq
     ,data_to_wordTheory.Sub_location_eq
@@ -482,6 +485,7 @@ val add_backend_compset = computeLib.extend_compset
     ,data_to_wordTheory.FromList1_code_def
     ,data_to_wordTheory.RefArray_code_def
     ,data_to_wordTheory.Replicate_code_def
+    ,data_to_wordTheory.StringLitLoop_code_def
     ,data_to_wordTheory.AnyArith_code_def
     ,data_to_wordTheory.Add_code_def
     ,data_to_wordTheory.Sub_code_def

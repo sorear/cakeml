@@ -193,6 +193,7 @@ fun compile_to_lab data_prog_def to_data_thm lab_prog_name =
       |> (REWR_CONV to_livesets_def THENC
           RAND_CONV (REWR_CONV to_data_thm) THENC
           REWR_CONV LET_THM THENC PAIRED_BETA_CONV THENC
+          PATH_CONV "rlralrr" eval THENC
           REWR_CONV LET_THM THENC BETA_CONV THENC
           REWR_CONV LET_THM THENC PAIRED_BETA_CONV THENC
           REWR_CONV LET_THM THENC BETA_CONV THENC
@@ -201,7 +202,7 @@ fun compile_to_lab data_prog_def to_data_thm lab_prog_name =
           REWR_CONV LET_THM THENC PAIRED_BETA_CONV THENC
           REWR_CONV LET_THM THENC
           PATH_CONV "rlrraraalralrarllr" eval THENC
-          PATH_CONV"rlrraraalralralralralrar"
+          PATH_CONV "rlrraraalralralralralrar"
             (RATOR_CONV(RATOR_CONV(RAND_CONV eval)) THENC
              (FIRST_CONV (map REWR_CONV (CONJUNCTS bool_case_thm)))))
     val tm0 = to_livesets_thm0 |> rconc |> rand |> rand
@@ -745,8 +746,8 @@ val (split16_tm,mk_split16,dest_split16,is_split16) = HolKernel.syntax_fns2 "exp
 
 fun format_byte s = String.concat("0x"::(if String.size s < 2 then ["0",s] else [s]))
 
-fun byte_to_string i = i |> Int.fmt StringCvt.HEX |> format_byte
-fun word_to_string i = i |> Int.fmt StringCvt.DEC
+fun byte_to_string i = i |> Arbnum.toHexString |> format_byte
+fun word_to_string i = i |> Arbnum.toString
 
 fun split16_to_app_list f [] = Nil
   | split16_to_app_list f xs =
@@ -777,7 +778,7 @@ fun split16_def_to_app_list term_to_app_list eval f def =
 fun split16_ml_to_app_list (prefix,to_string) def =
   let
     val (ls,ty) = listSyntax.dest_list(rconc def)
-    val ints = map wordsSyntax.uint_of_word ls
+    val ints = map wordsSyntax.dest_word_literal ls
   in split16_to_app_list (words_line prefix to_string) ints end
 
 fun emit_symbols_to_app_list tm =

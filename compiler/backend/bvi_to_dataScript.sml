@@ -29,6 +29,7 @@ Theorem op_space_reset_pmatch:
     | FromList _ => T
     | RefArray => T
     | RefByte _ => T
+    | String _ => T
     | ConsExtend _ => T
     | CopyByte new_flag => new_flag
     | ConfigGC => T
@@ -46,6 +47,7 @@ Theorem op_requires_names_eqn:
                           | FFI n => T
                           | Install => T
                           | CopyByte new_flag => T
+                          | String s => T
                           | _ => F))
 Proof
   Cases>>fs[op_requires_names_def]
@@ -57,6 +59,7 @@ Theorem op_requires_names_pmatch:
                         | FFI n => T
                         | Install => T
                         | CopyByte new_flag => T
+                        | String s => T
                         | _ => F))
 Proof
   rpt strip_tac >>

@@ -31,7 +31,7 @@ val _ = Datatype `
             ; has_fp_tern : bool (* can compile FMA *)
             ; big_endian : bool (* byte representation *)
             ; call_empty_ffi : bool (* emit (T) / omit (F) calls to FFI "" *)
-            ; strings : mlstring list (* strings collected by top-level *)
+            ; strings : (num # mlstring) list (* strings collected by top-level *)
             ; gc_kind : gc_kind (* GC settings *) |>`
 
 val adjust_var_def = Define `
@@ -151,8 +151,10 @@ val RefArray_location_def = Define`
   RefArray_location = RefByte_location+1`;
 val Replicate_location_def = Define `
   Replicate_location = RefArray_location+1`;
+val StringLitLoop_location_def = Define `
+  StringLitLoop_location = Replicate_location+1`;
 val AnyArith_location_def = Define `
-  AnyArith_location = Replicate_location+1`;
+  AnyArith_location = StringLitLoop_location+1`;
 val Add_location_def = Define `
   Add_location = AnyArith_location+1`;
 val Sub_location_def = Define `
@@ -191,10 +193,10 @@ val InstallCode_location_def = Define `
   InstallCode_location = Install_location+1`;
 val InstallData_location_def = Define `
   InstallData_location = InstallCode_location+1`;
-val Dummy_location_def = Define `
-  Dummy_location = InstallData_location+1`;
+(* val Dummy_location_def = Define `
+  Dummy_location = InstallData_location+1`; *)
 val Append_location_def = Define `
-  Append_location = Dummy_location+1`;
+  Append_location = InstallData_location+1`;
 val AppendMainLoop_location_def = Define `
   AppendMainLoop_location = Append_location+1`;
 val AppendLenLoop_location_def = Define `
@@ -214,6 +216,8 @@ val RefArray_location_eq = save_thm("RefArray_location_eq",
   ``RefArray_location`` |> EVAL);
 val Replicate_location_eq = save_thm("Replicate_location_eq",
   ``Replicate_location`` |> EVAL);
+val StringLitLoop_location_eq = save_thm("StringLitLoop_location_eq",
+  ``StringLitLoop_location`` |> EVAL);
 val AnyArith_location_eq = save_thm("AnyArith_location_eq",
   ``AnyArith_location`` |> EVAL);
 val Add_location_eq = save_thm("Add_location_eq",
@@ -442,6 +446,22 @@ val Replicate_code_def = Define `
                  Store (Var 2) 4;
                  Assign 6 (Op Sub [Var 6; Const 4w]);
                  Call NONE (SOME Replicate_location) [0;2;4;6;8] NONE])
+      :'a wordLang$prog`;
+
+val StringLitLoop_code_def = Define `
+  StringLitLoop_code =
+    (* 0 = return address
+       2 = address to write to
+       4 = rodata index to copy from
+       6 = how many left to write
+       8 = value to be returned *)
+    If Equal 6 (Imm 0w) (Return 0 8)
+      (list_Seq [Assign 2 (Op Add [Var 2; Const (bytes_in_word)]);
+                 StaticRead 1 4;
+                 Assign 4 (Op Add [Var 4; Const 1w]);
+                 Store (Var 2) 1;
+                 Assign 6 (Op Sub [Var 6; Const 1w]);
+                 Call NONE (SOME StringLitLoop_location) [0;2;4;6;8] NONE])
       :'a wordLang$prog`;
 
 val AddNumSize_def = Define `
@@ -1228,15 +1248,33 @@ val StoreEachWord_def = Define `
      Seq (Seq (Assign v2 (Const x)) (Store (Op Add [Var v1; Const offset]) v2))
          (StoreEachWord v1 v2 (offset + bytes_in_word) xs))`
 
+Definition extracted_string_def:
+  extracted_string strg [] pos = NONE /\
+  (extracted_string strg ((len,str)::strs) pos =
+    let blen = byte_len (:α) len in
+    if strg = str ∧ pos + blen < dimword (:α)
+    then SOME (n2w pos,n2w blen)
+    else (extracted_string strg strs (pos+blen):(α word#α word) option))
+End
+
 val def = assign_Define `
   assign_String (c:data_to_word$config) (secn:num)
                 (l:num) (dest:num) (names:num_set option) strg v1:('a wordLang$prog # num) =
-      (Seq
-       (Seq (Assign 1 (real_addr c (adjust_var v1)))
-            (StoreEachWord 1 3 bytes_in_word
-              (write_bytes (MAP (\c. n2w (ORD c)) strg)
-                (REPLICATE (byte_len (:'a) (LENGTH strg)) 0w) c.big_endian)))
-       (Assign (adjust_var dest) Unit), l)`
+     (dtcase extracted_string (implode strg) c.strings 0 of
+       | NONE => (Seq (Seq (Assign 1 (real_addr c (adjust_var v1)))
+                 (StoreEachWord 1 3 bytes_in_word
+                 (write_bytes (MAP (\c. n2w (ORD c)) strg)
+                 (REPLICATE (byte_len (:'a) (LENGTH strg)) 0w) c.big_endian)))
+                 (Assign (adjust_var dest) Unit),l)
+       | SOME (pos,len) =>
+           (Seq
+             (Seq (Assign 1 (real_addr c (adjust_var v1)))
+               (Seq (Assign 3 (Const pos))
+                 (Seq (Assign 5 (Const len))
+                      (Assign 7 Unit))))
+             (MustTerminate
+               (Call (SOME (adjust_var dest,adjust_set (get_names names),Skip,secn,l))
+                 (SOME StringLitLoop_location) [1; 3; 5; 7] NONE)),l+1))`
 
 val def = assign_Define `
   assign_CopyByte (c:data_to_word$config) (secn:num)
@@ -2258,6 +2296,7 @@ val stubs_def = Define`
     (RefByte_location,4n,RefByte_code data_conf);
     (RefArray_location,3n,RefArray_code data_conf);
     (Replicate_location,5n,Replicate_code);
+    (StringLitLoop_location,5n,StringLitLoop_code);
     (AnyArith_location,4n,AnyArith_code data_conf);
     (Add_location,3n,Add_code);
     (Sub_location,3n,Sub_code);
@@ -2282,7 +2321,7 @@ val stubs_def = Define`
     (ByteCopyAdd_location,5n,ByteCopyAdd_code);
     (ByteCopySub_location,5n,ByteCopySub_code);
     (ByteCopyNew_location,4n,ByteCopyNew_code data_conf);
-    (Dummy_location,0,Skip)
+    (* (Dummy_location,0,Skip) *)
   ] ++ generated_bignum_stubs Bignum_location`;
 
 val stub_names_def = Define`
@@ -2292,6 +2331,7 @@ val stub_names_def = Define`
     (RefByte_location,«_RefByte»);
     (RefArray_location,«_RefArray»);
     (Replicate_location,«_Replicate»);
+    (StringLitLoop_location,«_StringLitLoop»);
     (AnyArith_location,«_AnyArith»);
     (Add_location,«_Add»);
     (Sub_location,«_Sub»);
@@ -2316,7 +2356,7 @@ val stub_names_def = Define`
     (ByteCopyAdd_location,«_ByteCopyAdd»);
     (ByteCopySub_location,«_ByteCopySub»);
     (ByteCopyNew_location,«_ByteCopyNew»);
-    (Dummy_location,«_Dummy»)
+    (* (Dummy_location,«_Dummy») *)
   ] ++ GENLIST (\i. (i + Bignum_location, «_Bignum»))
     (data_num_stubs - Bignum_location)`;
 
@@ -2338,12 +2378,27 @@ val prepare_data_conf_def = Define `
         has_fp_tern := (asm_conf.ISA = ARMv7 /\ 2 < asm_conf.fp_reg_count);
         big_endian := asm_conf.big_endian |>`
 
+Definition extract_strings_prog_def:
+   extract_strings_prog p strs = case p of
+     | dataLang$Call _ _ _ (SOME (_,p2)) => extract_strings_prog p2 strs
+     | Seq p1 p2 => extract_strings_prog p1 (extract_strings_prog p2 strs)
+     | If _ p1 p2 => extract_strings_prog p1 (extract_strings_prog p2 strs)
+     | Assign _ (String strg) _ _ => if (DROP 16 strg ≠ []) then implode strg::strs else strs
+     | _ => strs
+End
+
+Theorem extract_strings_prog_dtcase =
+   extract_strings_prog_def |> CONV_RULE (PATH_CONV "bbr" patternMatchesLib.PMATCH_ELIM_CONV);
+
 Definition extract_strings_def:
-   extract_strings (prog:(num # num # dataLang$prog) list) = ([]:mlstring list)
+   extract_strings (prog:(num # num # dataLang$prog) list) =
+     MAP (λs. (strlen s,s)) (FLAT (MAP (λ(ix,args,p). extract_strings_prog p []) prog))
 End
 
 Definition strings_to_rodata_def:
-   strings_to_rodata (strs:mlstring list) = ([]:'a word list)
+   strings_to_rodata be (strs:(num # mlstring) list) =
+     FLAT (MAP (λ(len,str). write_bytes (MAP (λc. n2w (ORD c)) (explode str))
+           (REPLICATE (byte_len (:α) len) 0w) be) strs):α word list
 End
 
 val compile_def = Define `
@@ -2415,5 +2470,6 @@ Proof
     \\ pop_assum (fn th => once_rewrite_tac [th])
     \\ rewrite_tac [th_FF,AnyArith_call_tree_def,structure_le_def])
 QED
+
 
 val _ = export_theory();

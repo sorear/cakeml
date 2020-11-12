@@ -1129,7 +1129,8 @@ Theorem compile_semantics:
   init_store_ok c t.store t.memory t.mdomain t.code_buffer t.data_buffer ∧
   good_dimindex (:α) ∧ lookup 0 t.locals = SOME (Loc 1 0) ∧ t.stack = [] ∧
   conf_ok (:α) c  ∧ t.termdep = 0 ∧ code_rel c (fromAList prog) x1 ∧
-  c.big_endian = t.be ∧
+  c.big_endian = t.be ∧ strings_ok c.strings ∧
+  t.rodata = strings_to_rodata t.be c.strings ∧
   cc =
   (λcfg.
        OPTION_MAP (I ## MAP upper_w2w ## I) ∘ tcc cfg ∘

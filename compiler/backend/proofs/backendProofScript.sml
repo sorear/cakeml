@@ -2627,6 +2627,12 @@ Proof
    \\ rfs[dimword_def]
 QED
 
+Theorem app_range:
+  ?x. f y = f x
+Proof
+  qexists_tac`y` >> simp[]
+QED
+
 Theorem compile_correct':
 
   compile (c:'a config) prog = SOME (bytes,bitmaps,c') ⇒
@@ -2872,7 +2878,7 @@ simp[from_word_def] \\ pairarg_tac \\ fs[] \\ strip_tac \\
       data_sp
       stack_oracle` >>
   qabbrev_tac`stack_st = FST stack_st_opt` >>
-  qabbrev_tac`rodata = strings_to_rodata (extract_strings p4)` >>
+  qabbrev_tac`rodata = (strings_to_rodata c4.lab_conf.asm_conf.big_endian (extract_strings p4):α word list)` >>
   qabbrev_tac`word_st = word_to_stackProof$make_init kkk stack_st (fromAList p5) rodata word_oracle` \\
 
   rewrite_tac [is_safe_for_space_def] \\
@@ -3020,6 +3026,10 @@ simp[from_word_def] \\ pairarg_tac \\ fs[] \\ strip_tac \\
            data_to_wordTheory.prepare_data_conf_def,
            Abbr`c4_data_conf_s`] \\
     conj_tac >- simp[full_make_init_be,make_init_def,data_to_wordTheory.prepare_data_conf_def] \\
+    conj_tac>-simp[data_to_wordTheory.prepare_data_conf_def,
+                   data_to_word_gcProofTheory.strings_ok_def,Abbr`c4_data_conf_s`,app_range] \\
+    conj_tac>-simp[full_make_init_be,Abbr`rodata`,make_init_def,
+                   data_to_wordTheory.prepare_data_conf_def,Abbr`c4_data_conf_s`] \\
     CONJ_TAC>- (
       fs[Abbr`data_oracle`,full_co_def]
       \\ fs [backendPropsTheory.SND_state_co]
