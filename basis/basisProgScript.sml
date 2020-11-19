@@ -3,6 +3,7 @@
 *)
 open preamble ml_translatorLib ml_progLib cfLib basisFunctionsLib
      CommandLineProofTheory TextIOProofTheory RuntimeProofTheory PrettyPrinterProgTheory
+     fromSexpTheory astToSexprLib
 
 val _ = new_theory "basisProg"
 
@@ -76,8 +77,14 @@ QED
 
 val basis_st = get_ml_prog_state ();
 
-val basis_prog = basis_st |> remove_snocs |> ml_progLib.get_prog;
+val basis_prog = basis_st |> remove_snocs |> ml_progLib.get_prog
+  |> PURE_REWRITE_CONV[locationTheory.unknown_loc_def] |> rconc;
 
-val basis_def = Define `basis = ^basis_prog`;
+val basis_sexpr_str = let
+    val acc = ref ""
+    val _ = write_ast (fn str => acc := (!acc)^str) basis_prog
+  in !acc end
+
+val basis_def = Define `basis_sexp = strlit ^(stringSyntax.fromMLstring basis_sexpr_str)`;
 
 val _ = export_theory ()

@@ -136,7 +136,7 @@ val def = spec32 (PURE_REWRITE_RULE[fromSexpTheory.sexpdec_alt_intro1]compilerTh
 val _ = translate compilerTheory.locs_to_string_def;
 val res = translate def
 
-val res = translate basisProgTheory.basis_def
+val res = translate basisProgTheory.basis_sexp_def
 
 val res = translate (primTypesTheory.prim_tenv_def
                      |> CONV_RULE (RAND_CONV EVAL));
@@ -219,7 +219,7 @@ val res = format_compiler_result_def
         |> spec32
         |> translate;
 
-val res = translate compile_32_def;
+val res = translate (PURE_REWRITE_RULE[fromSexpTheory.sexpdec_alt_intro1]compile_32_def);
 
 val res = translate (has_version_flag_def |> SIMP_RULE (srw_ss()) [MEMBER_INTRO])
 val res = translate print_option_def
