@@ -48,17 +48,15 @@ QED
 val display_to_json_def = tDefine"display_to_json" `
   (display_to_json (Item tra name es) =
     let es' = MAP display_to_json es in
-    let props = [(strlit "name", String name); (strlit "args", Array es')] in
+    let props = String name::es' in
     let props' = case tra of
                    | NONE => props
-                   | SOME t => (strlit "trace", trace_to_json t)::props in
-      Object props')
+                   | SOME t => trace_to_json t::props in
+      Array props')
    /\
   (display_to_json (String s : sExp) = String s) /\
   (display_to_json (Tuple es) =
-    let es' = MAP display_to_json es in
-      Object [(strlit "isTuple", Bool T); (strlit "elements", Array es')])
-  /\
+    let es' = MAP display_to_json es in Array (String (strlit "T")::es')) /\
    (display_to_json (List es) = Array (MAP display_to_json es))`
   (WF_REL_TAC `measure sExp_size` \\ rw []
    \\ imp_res_tac MEM_sExp_size \\ fs []);
