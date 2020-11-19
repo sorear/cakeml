@@ -1996,11 +1996,14 @@ fun register_term_types register_type tm = let
     val (tname,targs) = dest_type ty
     in ty :: flatten (map typeops targs) end
     handle HOL_ERR _ => []
+  (* non-atomic terms which can be built from atoms have types which are the ranges
+     of atoms, and all function types are ignored above *)
   fun register_term_type tm = let
-    val tys = typeops (type_of tm) |> filter (not o ignore_type)
+    val tys = type_of tm |> repeat (#2 o dom_rng) |> typeops
+                         |> filter (not o ignore_type)
     val _ = map register_type tys
     in () end
-  in every_term register_term_type tm end;
+  in HOLset.app register_term_type (all_atoms tm) end;
 
 (* tests:
 register_type ``:'a list``;
@@ -3093,7 +3096,7 @@ fun apply_Eval_Recclosure recc fname v th = let
 
 fun move_Eval_conv tm =
   let
-    val (_,tm1) = strip_forall tm
+    val (_,tm1) = if is_forall tm then strip_forall tm else ([],tm)
     val tm2 = #2 (dest_imp tm1) handle HOL_ERR _ => tm1
   in
     if is_Eval tm2 then
