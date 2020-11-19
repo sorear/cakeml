@@ -195,15 +195,16 @@ fun compile_to_lab data_prog_def to_data_thm lab_prog_name =
           REWR_CONV LET_THM THENC PAIRED_BETA_CONV THENC
           PATH_CONV "rlralrr" eval THENC
           REWR_CONV LET_THM THENC BETA_CONV THENC
+          PATH_CONV "r" eval THENC
           REWR_CONV LET_THM THENC PAIRED_BETA_CONV THENC
           REWR_CONV LET_THM THENC BETA_CONV THENC
           REWR_CONV_BETA LET_THM THENC
           REWR_CONV LET_THM THENC BETA_CONV THENC
           REWR_CONV LET_THM THENC PAIRED_BETA_CONV THENC
           REWR_CONV LET_THM THENC
+          PATH_CONV "larlrraraalrraarrrllr" eval THENC
           PATH_CONV "rlrraraalralrarllr" eval THENC
-          PATH_CONV "rlrraraalralralralralrar"
-            (RATOR_CONV(RATOR_CONV(RAND_CONV eval)) THENC
+          PATH_CONV "rlrraraalralralralralrar" (PATH_CONV "llr" eval THENC
              (FIRST_CONV (map REWR_CONV (CONJUNCTS bool_case_thm)))))
     val tm0 = to_livesets_thm0 |> rconc |> rand |> rand
     val thm0 = timez "data_to_word" eval tm0;
