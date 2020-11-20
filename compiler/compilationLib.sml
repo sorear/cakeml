@@ -896,8 +896,10 @@ fun cbv_to_bytes
     val code_def = mk_abbrev code_name (#code result)
     val data_def = mk_abbrev data_name (#data result)
     val config_def = mk_abbrev config_name (#config result)
-    val result_thm = PURE_REWRITE_RULE[GSYM code_def, GSYM data_def,
-      GSYM config_def] bootstrap_thm
+    val result_thm = CONV_RULE (RAND_CONV (RAND_CONV
+      (FORK_CONV(REWR_CONV (SYM code_def),
+                 FORK_CONV(REWR_CONV (SYM data_def),
+                           REWR_CONV (SYM config_def)))))) bootstrap_thm
 
     val syms_tm = assoc "symbols" (#2 (TypeBase.dest_record (#config result)));
     val ffi_names_tm = extract_ffi_names_tm (#config result)
